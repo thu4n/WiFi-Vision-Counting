@@ -1,9 +1,10 @@
 #!/bin/bash
 BAURATE=921600
 PORT=/dev/ttyUSB0
+SES=s1
 
 # Run minicom with capture and filtering
-timeout 3s minicom -b $BAURATE -D $PORT | grep "CSI_DATA" > csi-frame.csv &
+timeout 3s sudo minicom -b $BAURATE -D $PORT | grep "CSI_DATA" > csi-frame-{$SES}.csv &
 
 # Capture the process ID of the background minicom job
 minicom_pid=$!
