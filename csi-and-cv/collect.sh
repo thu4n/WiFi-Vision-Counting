@@ -8,7 +8,7 @@ fi
 echo "Session: $0"
 
 # Collects the data from the CSI and CV experiments
-./csi_frame_collect.py > sess_${SESS}_csi.csv &
+sudo python3 csi_frame_collect.py > sess_${SESS}_csi.csv &
 CSI_PID=$!
 ./cv_frame_collect.py $SESS &
 CV_PID=$!
