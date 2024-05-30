@@ -2,6 +2,7 @@
 import cv2
 import os
 import time
+import sys
 
 # Define the GStreamer pipeline for the CSI camera
 def gstreamer_pipeline(
@@ -34,7 +35,7 @@ def gstreamer_pipeline(
 def capture_image():
     frame_count = 0
     start_time = time.time()
-    duration = 120  # capture duration in seconds
+    duration = 10  # capture duration in seconds
 
     while True:  
         ret_val, frame = cap.read()
@@ -57,7 +58,8 @@ def capture_image():
             print(f"Frames: {frame_count-1}")
             break
 
-num = 1
+num = sys.argv[1] if len(sys.argv) > 1 else 1
+
 output_dir = f"captured_frames_{num}"
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
