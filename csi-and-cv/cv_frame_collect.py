@@ -34,7 +34,7 @@ def gstreamer_pipeline(
 def capture_image():
     frame_count = 0
     start_time = time.time()
-    duration = 120  # capture duration in seconds
+    duration = 10  # capture duration in seconds
 
     while True:  
         ret_val, frame = cap.read()
