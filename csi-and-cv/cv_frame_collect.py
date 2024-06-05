@@ -60,7 +60,8 @@ def capture_image():
 
 num = sys.argv[1] if len(sys.argv) > 1 else 1
 
-output_dir = f"captured_frames_{num}"
+#output_dir = f"captured_frames_{num}"
+output_dir = f"cv_dev/captured_frames{num}"
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
