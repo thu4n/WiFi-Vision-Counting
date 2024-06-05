@@ -16,7 +16,7 @@ def main():
         while True:
             try:
                 data = ser.readline().decode("utf-8").strip()
-                if "CSI_DATA" in data:
+                if "CSI_DATA" in data and data.endswith("]"):
                     print(data.strip() + "," + str(time.time()))
                     frame_count += 1
                 if time.time() - start_time > duration:
