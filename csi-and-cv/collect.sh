@@ -21,7 +21,7 @@ echo "Session: $SESS"
 sudo python3 csi_frame_collect.py 0 > ./$DEV_0/sess_${SESS}_csi.csv &
 sudo python3 csi_frame_collect.py 1 > ./$DEV_1/sess_${SESS}_csi.csv &
 
-if [ $? -ne 0 ]; then
+if [ $? -eq 0 ]; then
     ./cv_frame_collect.py $SESS &
 fi
 #CSI_PID=$!
