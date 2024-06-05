@@ -17,6 +17,9 @@ fi
 
 echo "Session: $SESS"
 
+read -s -p "Enter Password for sudo: " PASSWORD
+echo $PASSWORD | sudo -S echo "Password accepted"
+
 # Collects the data from the CSI and CV experiments
 sudo python3 csi_frame_collect.py 0 > ./$DEV_0/sess_${SESS}_csi.csv &
 sudo python3 csi_frame_collect.py 1 > ./$DEV_1/sess_${SESS}_csi.csv &
