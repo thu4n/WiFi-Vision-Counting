@@ -20,7 +20,7 @@ fi
 echo "Session: $SESS"
 
 # Get the duration of the experiment
-read "Duration(seconds): " DURATION
+read -p "Duration(seconds): " DURATION
 
 # Check if the duration is provided, if not set it to 10 seconds
 if [ -z "$DURATION" ]; then
