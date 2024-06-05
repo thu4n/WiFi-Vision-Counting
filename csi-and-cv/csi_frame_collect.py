@@ -10,7 +10,7 @@ def main():
     # Configure the serial port
     ser = serial.Serial(serial_port, baudrate=baud_rate, timeout=0.1)
     try:
-        duration = 10
+        duration = sys.argv[2]  # capture duration in seconds
         frame_count = 0
         start_time = time.time()
         while True:
