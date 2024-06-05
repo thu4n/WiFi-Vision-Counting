@@ -18,10 +18,10 @@ fi
 echo "Session: $SESS"
 
 # Collects the data from the CSI and CV experiments
-sudo python3 csi_dev_0.py > ./$DEV_0/sess_${SESS}_csi.csv &
-sudo python3 csi_dev_0.py > ./$DEV_1/sess_${SESS}_csi.csv &
+sudo python3 csi_frame_collect.py 0 > ./$DEV_0/sess_${SESS}_csi.csv &
+sudo python3 csi_frame_collect.py 1 > ./$DEV_1/sess_${SESS}_csi.csv &
 
-if [ $? -eq 0 ]; then
+if [ $? -ne 0 ]; then
     ./cv_frame_collect.py $SESS &
 fi
 #CSI_PID=$!
