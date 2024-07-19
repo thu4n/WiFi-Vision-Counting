@@ -1,0 +1,43 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/home/thu4n/Downloads/ESP32-CSI-Tool/active_ap/build/CMakeFiles/bootloader"
+		},
+		{
+			"file" : "/home/thu4n/Downloads/ESP32-CSI-Tool/active_ap/build/CMakeFiles/bootloader.rule"
+		},
+		{
+			"file" : "/home/thu4n/Downloads/ESP32-CSI-Tool/active_ap/build/CMakeFiles/bootloader-complete.rule"
+		},
+		{
+			"file" : "/home/thu4n/Downloads/ESP32-CSI-Tool/active_ap/build/bootloader-prefix/src/bootloader-stamp/bootloader-install.rule"
+		},
+		{
+			"file" : "/home/thu4n/Downloads/ESP32-CSI-Tool/active_ap/build/bootloader-prefix/src/bootloader-stamp/bootloader-mkdir.rule"
+		},
+		{
+			"file" : "/home/thu4n/Downloads/ESP32-CSI-Tool/active_ap/build/bootloader-prefix/src/bootloader-stamp/bootloader-download.rule"
+		},
+		{
+			"file" : "/home/thu4n/Downloads/ESP32-CSI-Tool/active_ap/build/bootloader-prefix/src/bootloader-stamp/bootloader-update.rule"
+		},
+		{
+			"file" : "/home/thu4n/Downloads/ESP32-CSI-Tool/active_ap/build/bootloader-prefix/src/bootloader-stamp/bootloader-patch.rule"
+		},
+		{
+			"file" : "/home/thu4n/Downloads/ESP32-CSI-Tool/active_ap/build/bootloader-prefix/src/bootloader-stamp/bootloader-configure.rule"
+		},
+		{
+			"file" : "/home/thu4n/Downloads/ESP32-CSI-Tool/active_ap/build/bootloader-prefix/src/bootloader-stamp/bootloader-build.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"bootloader"
+		],
+		"name" : "bootloader"
+	}
+}

@@ -1,0 +1,13 @@
+# Target labels
+ bootloader
+# Source files and their labels
+/home/thu4n/Downloads/ESP32-CSI-Tool/active_ap/build/CMakeFiles/bootloader
+/home/thu4n/Downloads/ESP32-CSI-Tool/active_ap/build/CMakeFiles/bootloader.rule
+/home/thu4n/Downloads/ESP32-CSI-Tool/active_ap/build/CMakeFiles/bootloader-complete.rule
+/home/thu4n/Downloads/ESP32-CSI-Tool/active_ap/build/bootloader-prefix/src/bootloader-stamp/bootloader-install.rule
+/home/thu4n/Downloads/ESP32-CSI-Tool/active_ap/build/bootloader-prefix/src/bootloader-stamp/bootloader-mkdir.rule
+/home/thu4n/Downloads/ESP32-CSI-Tool/active_ap/build/bootloader-prefix/src/bootloader-stamp/bootloader-download.rule
+/home/thu4n/Downloads/ESP32-CSI-Tool/active_ap/build/bootloader-prefix/src/bootloader-stamp/bootloader-update.rule
+/home/thu4n/Downloads/ESP32-CSI-Tool/active_ap/build/bootloader-prefix/src/bootloader-stamp/bootloader-patch.rule
+/home/thu4n/Downloads/ESP32-CSI-Tool/active_ap/build/bootloader-prefix/src/bootloader-stamp/bootloader-configure.rule
+/home/thu4n/Downloads/ESP32-CSI-Tool/active_ap/build/bootloader-prefix/src/bootloader-stamp/bootloader-build.rule
