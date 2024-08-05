@@ -1,6 +1,0 @@
-CMake Error at /home/thu4n/esp/esp-idf/tools/cmake/project.cmake:2 (cmake_minimum_required):
-  CMake 3.16 or higher is required.  You are running version 3.10.2
-Call Stack (most recent call first):
-  CMakeLists.txt:5 (include)
-
-
