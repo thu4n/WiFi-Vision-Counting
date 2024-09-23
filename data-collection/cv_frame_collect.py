@@ -2,7 +2,7 @@
 import cv2
 import os
 import time
-import sys
+
 
 def capture_image(time_duration, person_num):
     frame_count = 0
@@ -10,6 +10,8 @@ def capture_image(time_duration, person_num):
     start_time = time.time()
     duration = time_duration if time_duration else 10 # capture duration in seconds
     output_dir = f"cv_dev/{person_num}_person"
+    desired_fps = 10
+    time_between_frames = 1 / desired_fps
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
@@ -25,6 +27,7 @@ def capture_image(time_duration, person_num):
         frame_filename = os.path.join(output_dir, f"frame_{time.time()}.jpg") 
         cv2.imwrite(frame_filename, frame)
         frame_count += 1
+        time.sleep(time_between_frames)
 
 def main():
     # Initialize the camera
@@ -32,7 +35,7 @@ def main():
 
     if cap.isOpened():
         try:
-            capture_image()
+            capture_image(10, 1)
 
         finally:
             cap.release()
