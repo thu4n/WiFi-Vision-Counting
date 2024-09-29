@@ -19,7 +19,6 @@ def clear_directory(output_dir):
         print(f"'{output_dir}' is already empty.")
 
 def main():
-    # clear_directory('D:\WorkSpace\WiFi-Vision-Counting\data-collection\cv_main\session_1')
     pass
 
 if __name__ == "__main__":
