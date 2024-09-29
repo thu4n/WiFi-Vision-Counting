@@ -1,6 +1,4 @@
 python_utils/
-cv_dev/
-csv_clean.py 
-dark_img.py
+cv_*/
 *pycache*/
 .venv/
