@@ -3,3 +3,5 @@ cv_*/
 csi_*/
 *pycache*/
 .venv/
+.env
+*_log.txt
