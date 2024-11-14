@@ -4,6 +4,8 @@ import numpy as np
 import time
 import utils.utils
 import model.detector
+import tensorflow as tf
+import pandas as pd
 
 # Define the CSI camera pipeline
 def gstreamer_pipeline(
@@ -33,55 +35,71 @@ if __name__ == '__main__':
     model.load_state_dict(torch.load(model_path, map_location=device))
     model.eval()
 
+    csi_path = 'modelzoo/k-fold_DNNR_session_5.keras' # Download from Google Drive first, another model choice is WiCount_FE_DNNR_2days.keras
+    csi_model = tf.keras.models.load_model(csi_path)
+    df = pd.read_csv('data/csi-features-full-d1-5.csv')
+
     # Start CSI camera capture
-    cap = cv2.VideoCapture(gstreamer_pipeline(), cv2.CAP_GSTREAMER)
-    if not cap.isOpened():
-        print("Failed to open CSI camera")
-        exit()
+    #cap = cv2.VideoCapture(gstreamer_pipeline(), cv2.CAP_GSTREAMER)
+    cap = cv2.VideoCapture(0)
+    # if not cap.isOpened():
+    #     print("Failed to open CSI camera")
+    #     exit()
 
     LABEL_NAMES = []
     with open(cfg["names"], 'r') as f:
         LABEL_NAMES = [line.strip() for line in f.readlines()]
 
+    last_time = time.time()
+    interval = 2
+    cv_count = 0
+    csi_count = 0
+
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
             break
+        current_time = time.time()
 
-        # Resize frame to model input size
-        res_img = cv2.resize(frame, (cfg["width"], cfg["height"]), interpolation=cv2.INTER_LINEAR)
-        img = res_img.reshape(1, cfg["height"], cfg["width"], 3)
-        img = torch.from_numpy(img.transpose(0, 3, 1, 2)).to(device).float() / 255.0
+        if current_time - last_time >= interval:
+            csi_count = csi_model.predict(df)
 
-        # Model inference
-        start = time.perf_counter()
-        preds = model(img)
-        end = time.perf_counter()
-        print(f"Inference time: {(end - start) * 1000:.2f} ms")
+            # Resize frame to model input size
+            res_img = cv2.resize(frame, (cfg["width"], cfg["height"]), interpolation=cv2.INTER_LINEAR)
+            img = res_img.reshape(1, cfg["height"], cfg["width"], 3)
+            img = torch.from_numpy(img.transpose(0, 3, 1, 2)).to(device).float() / 255.0
 
-        # Process predictions
-        output = utils.utils.handel_preds(preds, cfg, device)
-        output_boxes = utils.utils.non_max_suppression(output, conf_thres=0.3, iou_thres=0.4)
+            # Model inference
+            start = time.perf_counter()
+            preds = model(img)
+            end = time.perf_counter()
+            print(f"Inference time: {(end - start) * 1000:.2f} ms")
 
-        h, w, _ = frame.shape
-        scale_h, scale_w = h / cfg["height"], w / cfg["width"]
-        person_count = 0
-        # Draw bounding boxes
-        for box in output_boxes[0]:
-            box = box.tolist()
-            obj_score = box[4]
-            category = LABEL_NAMES[int(box[5])]
+            # Process predictions
+            output = utils.utils.handel_preds(preds, cfg, device)
+            output_boxes = utils.utils.non_max_suppression(output, conf_thres=0.3, iou_thres=0.4)
 
-            #if category == 'person' and obj_score > 0.8:
-            if category == 'person':
-                person_count += 1
-                x1, y1 = int(box[0] * scale_w), int(box[1] * scale_h)
-                x2, y2 = int(box[2] * scale_w), int(box[3] * scale_h)
+            h, w, _ = frame.shape
+            scale_h, scale_w = h / cfg["height"], w / cfg["width"]
+            cv_count = 0
+            # Draw bounding boxes
+            for box in output_boxes[0]:
+                box = box.tolist()
+                obj_score = box[4]
+                category = LABEL_NAMES[int(box[5])]
 
-                cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 255, 0), 2)
-                cv2.putText(frame, f'{category} {obj_score:.2f}', (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                if category == 'person':
+                    cv_count += 1
+                    x1, y1 = int(box[0] * scale_w), int(box[1] * scale_h)
+                    x2, y2 = int(box[2] * scale_w), int(box[3] * scale_h)
 
-        cv2.putText(frame, f"Total: {person_count}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 255, 0), 2)
+                    cv2.putText(frame, f'{category} {obj_score:.2f}', (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+            last_time = current_time
+
+        cv2.putText(frame, f"CV count: {cv_count}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+        cv2.putText(frame, f"CSI count: {csi_count[0][0]}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
         # Display result
         cv2.imshow("CSI Camera Detection", frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
