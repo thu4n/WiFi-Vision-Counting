@@ -142,7 +142,6 @@ def extract_features(filtered_df_with_rssi):
       euclidean_distances.append(distances)
 
     features['euc'] = np.median(euclidean_distances)
-    features['rss_std']= np.std(filtered_df_with_rssi[:, -1])
     features = pd.DataFrame([features])
     return features
 
@@ -157,6 +156,6 @@ def process_csi_from_csv(csi_path):
     temp_np_array = np.array(temp_df) # Turn into numpy array for easier matrix calculation
 
     temp_df = extract_features(temp_np_array)
-    scaler = joblib.load('modelzoo/k-fold_scaler_session_5.pkl')
+    scaler = joblib.load('modelzoo/1611_scaler_fold_2.pkl')
     final_csi_data = scaler.transform(temp_df)
     return final_csi_data

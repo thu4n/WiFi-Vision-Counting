@@ -77,7 +77,7 @@ def capture_csi():
 
 def process_csi():
     global csi_count
-    csi_path = 'modelzoo/k-fold_DNNR_session_5.keras' 
+    csi_path = 'modelzoo/1611_model_fold_2.keras' 
     csi_model = tf.keras.models.load_model(csi_path)
     while True:
         with open(output_file, mode="r") as csvfile:
