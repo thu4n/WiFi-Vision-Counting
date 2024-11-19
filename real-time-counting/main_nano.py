@@ -171,11 +171,11 @@ def process_yolo(stop_event,csi_count,frame_queue):
     yolo_model.load_state_dict(torch.load(model_path, map_location=device))
     yolo_model.eval()
     # Start CSI camera capture
-    cap = cv2.VideoCapture(gstreamer_pipeline(flip_method=0), cv2.CAP_GSTREAMER)
+    # cap = cv2.VideoCapture(gstreamer_pipeline(flip_method=0), cv2.CAP_GSTREAMER)
 
-    if not cap.isOpened():
-        print("Error: Could not open camera.")
-        return
+    # if not cap.isOpened():
+    #     print("Error: Could not open camera.")
+    #     return
     LABEL_NAMES = ['person']
 
     cv_count = 0
