@@ -147,7 +147,21 @@ def gstreamer_pipeline(
         f"videoconvert ! video/x-raw, format=(string)BGR ! appsink"
     )
 
-def process_yolo(stop_event,csi_count):
+def capture_frame(stop_event, frame_queue):
+    cap = cv2.VideoCapture(gstreamer_pipeline(flip_method=0), cv2.CAP_GSTREAMER)
+
+    if not cap.isOpened():
+        print("Error: Could not open camera.")
+        return
+    while not stop_event.is_set():
+        ret, frame = cap.read()
+        if ret:
+            if not frame_queue.full():
+                frame_queue.put(frame)
+        time.sleep(0.1) # Let the nano breathe a little bit
+    cap.release()
+
+def process_yolo(stop_event,csi_count,frame_queue):
     print("YOLO Process: Running")
     # Load configuration and model
     cfg = utils.utils.load_datafile('./data/coco.data')
@@ -164,17 +178,11 @@ def process_yolo(stop_event,csi_count):
         return
     LABEL_NAMES = ['person']
 
-    last_time = time.time()
-    interval = 2
     cv_count = 0
 
-    while not stop_event.is_set() and cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:
-            break
-        current_time = time.time()
-
-        if current_time - last_time >= interval:
+    while not stop_event.is_set():
+        if not frame_queue.empty():
+            frame = frame_queue.get()
             # Resize frame to model input size
             res_img = cv2.resize(frame, (cfg["width"], cfg["height"]), interpolation=cv2.INTER_LINEAR)
             img = res_img.reshape(1, cfg["height"], cfg["width"], 3)
@@ -207,34 +215,35 @@ def process_yolo(stop_event,csi_count):
                     cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 255, 0), 2)
                     cv2.putText(frame, f'{category} {obj_score:.2f}', (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
-            last_time = current_time
+            cv2.putText(frame, f"CV count: {cv_count}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+            if csi_count:
+                try:
+                    cv2.putText(frame, f"CSI count: {csi_count.value}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+                except:
+                    continue
 
-        cv2.putText(frame, f"CV count: {cv_count}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
-        if csi_count:
-            try:
-                cv2.putText(frame, f"CSI count: {csi_count.value}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
-            except:
-                continue
-        # Display result
-        cv2.imshow("CSI Camera Detection", frame)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+            # Display result
+            cv2.imshow("CSI Camera Detection", frame)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                stop_event.set()
+                break
+        time.sleep(2)
 
-    cap.release()
     cv2.destroyAllWindows()
 
 if __name__ == '__main__':
     stop_event = multiprocessing.Event()
     csi_count = multiprocessing.Value('d', 0.0) # Share count value with YOLO process
-    # Start threads for collecting CSI data, processing YOLO, and combining outputs
-    # writer_thread = threading.Thread(target=capture_csi, args=("/dev/ttyUSB0",), daemon=True)
-    # yolo_thread = threading.Thread(target=process_yolo, daemon=True)
-    # csi_thread = threading.Thread(target=process_csi, daemon=True)
-    writer_process = multiprocessing.Process(target=capture_csi, args=(stop_event, "/dev/ttyUSB0"))
-    yolo_process = multiprocessing.Process(target=process_yolo, args=(stop_event, csi_count))
-    csi_process = multiprocessing.Process(target=process_csi, args=(stop_event, csi_count))
+    frame_queue = multiprocessing.Queue(maxsize=5) 
 
-    writer_process.start()
+    # Start processes for collecting CSI data, processing YOLO, and combining outputs
+    csv_process = multiprocessing.Process(target=capture_csi, args=(stop_event, "/dev/ttyUSB0"))
+    csi_process = multiprocessing.Process(target=process_csi, args=(stop_event, csi_count))
+    camera_process = multiprocessing.Process(target=capture_frame, args=(stop_event, frame_queue))
+    yolo_process = multiprocessing.Process(target=process_yolo, args=(stop_event, csi_count, frame_queue))
+
+    csv_process.start()
+    camera_process.start()
     yolo_process.start()
     csi_process.start()
 
@@ -244,7 +253,8 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         print("Processes stopping...")
         stop_event.set()
-        writer_process.join()
+        csv_process.join()
+        camera_process.join()
         yolo_process.join()
         csi_process.join()
         print("All processes stopped.")
