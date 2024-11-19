@@ -168,16 +168,16 @@ def process_yolo():
 
 
 # Start threads for collecting CSI data, processing YOLO, and combining outputs
-writer_thread = threading.Thread(target=capture_csi, daemon=True)
-yolo_thread = threading.Thread(target=process_yolo, daemon=True)
-csi_thread = threading.Thread(target=process_csi, daemon=True)
+#writer_thread = threading.Thread(target=capture_csi, daemon=True)
+#yolo_thread = threading.Thread(target=process_yolo, daemon=True)
+#csi_thread = threading.Thread(target=process_csi, daemon=True)
 
-writer_thread.start()
-yolo_thread.start()
-csi_thread.start()
+#writer_thread.start()
+#yolo_thread.start()
+#csi_thread.start()
 
-try:
-    while True:
-        time.sleep(1)
-except KeyboardInterrupt:
-    print("Program stopped.")
+#try:
+#    while True:
+#        time.sleep(1)
+#except KeyboardInterrupt:
+#    print("Program stopped.")

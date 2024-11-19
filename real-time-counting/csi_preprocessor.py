@@ -3,7 +3,7 @@ import pandas as pd
 from scipy.signal import savgol_filter
 from hampel import hampel
 import joblib
-from sklearn.impute import SimpleImputer
+#from sklearn.impute import SimpleImputer
 
 class ESP32:
     """Parse ESP32 Wi-Fi Channel State Information (CSI) obtained using ESP32 CSI Toolkit by Hernandez and Bulut.
