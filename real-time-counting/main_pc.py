@@ -39,10 +39,9 @@ def gstreamer_pipeline(
         f"videoconvert ! video/x-raw, format=(string)BGR ! appsink"
     )
 
-def capture_csi():
+def capture_csi(serial_port="COM3"):
     print("CSI Thread: Running")
     # ESP specs
-    serial_port = "COM3"  # Set the serial port number
     baud_rate = 921600  # Set the baud rate
     ser = serial.Serial(serial_port, baudrate=baud_rate, timeout=0.1) # Configure the serial port
    
@@ -96,7 +95,7 @@ def process_yolo():
     print("YOLO Thread: Running")
     # Load configuration and model
     cfg = utils.utils.load_datafile('./data/coco.data')
-    model_path = 'modelzoo/coco2017-0.241078ap-model.pth'
+    model_path = 'modelzoo/yolofv2-nano-190-epoch-0.953577ap-model.pth'
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     yolo_model = model.detector.Detector(cfg["classes"], cfg["anchor_num"], True).to(device)
     yolo_model.load_state_dict(torch.load(model_path, map_location=device))

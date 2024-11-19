@@ -138,7 +138,7 @@ def extract_features(filtered_df_with_rssi):
 
     euclidean_distances = []
     for i in range(1, filtered_df_with_rssi.shape[0]):  # Loop through packets starting from the second
-      distances = np.linalg.norm(filtered_df_with_rssi[i, :] - filtered_df_with_rssi[i-1, :], axis=0)
+      distances = np.linalg.norm(filtered_df_with_rssi[i, :] - filtered_df_with_rssi[i-1, :])
       euclidean_distances.append(distances)
 
     features['euc'] = np.median(euclidean_distances)
