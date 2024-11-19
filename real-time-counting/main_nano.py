@@ -42,7 +42,7 @@ def capture_csi(stop_event, serial_port="/dev/ttyUSB0"):
     "ant", "sig_len", "rx_state", "real_time_set", "real_timestamp", "len", 
     "CSI_DATA", "machine_timestamp"
     ]
-    with open(output_file, mode="w", newline="") as csvfile:
+    with open(output_file, mode="w+", newline="") as csvfile:
         csv_writer = csv.writer(csvfile)
         csv_writer.writerow(header)  
         while True:
@@ -101,7 +101,7 @@ def csi_inference(engine, h_input, d_input, h_output, d_output, csi_data):
     return h_output
 
 def process_csi(stop_event,csi_count):
-    # global csi_count
+    print("CSI Inference Process: Starting")
     # Path to the TensorRT engine file
     csi_engine_path = '/home/thu4n/1611_model_fold_2.trt'
 
