@@ -18,7 +18,7 @@ class ESP32:
     def __read_file(self):
         """Read RAW CSI file (.csv) using Pandas and return a Pandas dataframe
         """
-        self.csi_df = pd.read_csv(self.csi_file)
+        self.csi_df = pd.read_csv(self.csi_file, on_bad_lines='skip')
 
     def seek_file(self):
         """Seek RAW CSI file
@@ -77,14 +77,6 @@ class ESP32:
         """
         amplitude = np.array([np.sqrt(data[::2]**2 + data[1::2]**2) for data in self.csi_data])
         self.amplitude = amplitude
-        return self
-
-    def get_phase_from_csi(self):
-        """Calculate the Amplitude (or Magnitude) from CSI
-        Ref: https://farside.ph.utexas.edu/teaching/315/Waveshtml/node88.html
-        """
-        phase = np.array([np.arctan2(data[::2], data[1::2]) for data in self.csi_data])
-        self.phase = phase
         return self
 
 def extract_amplitude(raw_data):

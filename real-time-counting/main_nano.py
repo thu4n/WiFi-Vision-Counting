@@ -10,12 +10,30 @@ import serial
 import csv
 from csi_preprocessor import process_csi_from_csv
 import multiprocessing
+import psutil
 
 # Nano specific libs
 import pycuda.driver as cuda
 import pycuda.autoinit
 import numpy as np
 import tensorrt as trt
+
+# Define resource limits
+MAX_CPU_PERCENT = 85  # Maximum CPU usage percentage
+MAX_MEMORY_PERCENT = 85  # Maximum memory usage percentage
+
+def check_resources():
+    # Check CPU usage
+    cpu_percent = psutil.cpu_percent(interval=1)
+    if cpu_percent > MAX_CPU_PERCENT:
+        print(f"CPU usage too high: {cpu_percent}%")
+        sys.exit(1)
+
+    # Check memory usage
+    memory_info = psutil.virtual_memory()
+    if memory_info.percent > MAX_MEMORY_PERCENT:
+        print(f"Memory usage too high: {memory_info.percent}%")
+        sys.exit(1)
 
 '''
 CSI Section 
@@ -81,6 +99,8 @@ def allocate_buffers(engine):
 
 # Function to perform inference with TensorRT engine
 def csi_inference(engine, h_input, d_input, h_output, d_output, csi_data):
+    check_resources()
+
     stream = cuda.Stream()
     
     np.copyto(h_input, csi_data.ravel())
@@ -104,6 +124,7 @@ def process_csi(output_file, stop_event, data_ready_event, inference_done_event,
             print("Waiting for data_ready_event")
             data_ready_event.wait()
             data_ready_event.clear()
+            check_resources()
 
             with open(output_file, mode="r") as csvfile:
                 csv_reader = csv.reader(csvfile)
@@ -140,7 +161,7 @@ def gstreamer_pipeline(
 
 def capture_frame(stop_event, frame_queue):
     cap = cv2.VideoCapture(gstreamer_pipeline(flip_method=0), cv2.CAP_GSTREAMER)
-
+    check_resources()
     if not cap.isOpened():
         print("Error: Could not open camera.")
         return
@@ -149,7 +170,7 @@ def capture_frame(stop_event, frame_queue):
         if ret:
             if not frame_queue.full():
                 frame_queue.put(frame)
-        time.sleep(0.1) # Let the nano breathe a little bit
+        time.sleep(0.2) # Let the nano breathe a little bit
     cap.release()
 
 def process_yolo(stop_event,csi_count,frame_queue):
@@ -160,19 +181,15 @@ def process_yolo(stop_event,csi_count,frame_queue):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     yolo_model = model.detector.Detector(cfg["classes"], cfg["anchor_num"], True).to(device)
     yolo_model.load_state_dict(torch.load(model_path, map_location=device))
+    check_resources()
     yolo_model.eval()
-    # Start CSI camera capture
-    # cap = cv2.VideoCapture(gstreamer_pipeline(flip_method=0), cv2.CAP_GSTREAMER)
-
-    # if not cap.isOpened():
-    #     print("Error: Could not open camera.")
-    #     return
     LABEL_NAMES = ['person']
 
     cv_count = 0
 
     while not stop_event.is_set():
         if not frame_queue.empty():
+            check_resources()
             frame = frame_queue.get()
             # Resize frame to model input size
             res_img = cv2.resize(frame, (cfg["width"], cfg["height"]), interpolation=cv2.INTER_LINEAR)
@@ -267,6 +284,7 @@ if __name__ == '__main__':
     try:
         while True:
             time.sleep(1)
+            check_resources()
     except KeyboardInterrupt:
         print("Processes stopping...")
         process_stop_event.set()
