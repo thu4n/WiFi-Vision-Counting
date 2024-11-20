@@ -18,7 +18,7 @@ class ESP32:
     def __read_file(self):
         """Read RAW CSI file (.csv) using Pandas and return a Pandas dataframe
         """
-        self.csi_df = pd.read_csv(self.csi_file, on_bad_lines='skip')
+        self.csi_df = pd.read_csv(self.csi_file, error_bad_lines=False)
 
     def seek_file(self):
         """Seek RAW CSI file

@@ -62,9 +62,9 @@ def capture_csi(output_file, stop_event, data_ready_event, inference_done_event,
 
             while time.time() - start_time < 2:
                 try:
-                    data = ser.readline().decode("utf-8")
-                    if isinstance(data, str):
-                        data = data.strip()
+                    data = ser.readline().decode("utf-8").strip()
+                    #if isinstance(data, str):
+                        #data = data.strip()
 
                     if data.startswith("CSI_DATA") and data.endswith("]"):
                         timestamp = str(time.time())
@@ -75,9 +75,11 @@ def capture_csi(output_file, stop_event, data_ready_event, inference_done_event,
 
                         if frame == 1:
                             print("--- Start capturing CSI frames ---")
+                    else:
+                        print("False CSI data")
                 except Exception as e:
                     print("CSI Data Writing Exception:", {e})
-                    pass
+                    continue
 
         data_ready_event.set()
         inference_done_event.wait()
@@ -102,6 +104,7 @@ def allocate_buffers(engine):
 
 # Function to perform inference with TensorRT engine
 def csi_inference(engine, h_input, d_input, h_output, d_output, csi_data):
+    print("Running actual inference")
     check_resources()
 
     stream = cuda.Stream()
@@ -128,16 +131,19 @@ def process_csi(output_file, stop_event, data_ready_event, inference_done_event,
             data_ready_event.wait()
             data_ready_event.clear()
             check_resources()
-
-            with open(output_file, mode="r") as csvfile:
-                csv_reader = csv.reader(csvfile)
-                rows = list(csv_reader)
-                
-                if len(rows) > 1:
-                    processed_csi = process_csi_from_csv(output_file)
-                    csi_count_array = csi_inference(csi_model, h_input, d_input, h_output, d_output, processed_csi)
-                    csi_count.value = csi_count_array[0][0]
-                    print("CSI count:", csi_count.value)
+            try:
+                with open(output_file, mode="r") as csvfile:
+                    csv_reader = csv.reader(csvfile)
+                    rows = list(csv_reader)
+                    
+                    if len(rows) > 1:
+                        processed_csi = process_csi_from_csv(output_file)
+                        csi_count_array = csi_inference(csi_model, h_input, d_input, h_output, d_output, processed_csi)
+                        csi_count.value = csi_count_array[0][0]
+                        print("CSI count:", csi_count.value)
+            except Exception as e:
+                print("Super exception when reading csv: ", e)
+                continue
 
             inference_done_event.set()
     except Exception as e:
@@ -276,12 +282,12 @@ if __name__ == '__main__':
     csi_capture_process = multiprocessing.Process(target=capture_csi, args=(output_file, process_stop_event, csi_data_ready_event, csi_inference_done_event ,"/dev/ttyUSB0"))
     csi_inference_process = multiprocessing.Process(target=process_csi, args=(output_file, process_stop_event, csi_data_ready_event, csi_inference_done_event,
                                                                     csi_count, csi_model, h_input, d_input, h_output, d_output))
-    camera_process = multiprocessing.Process(target=capture_frame, args=(process_stop_event, frame_queue))
-    yolo_process = multiprocessing.Process(target=process_yolo, args=(process_stop_event, csi_count, frame_queue))
+#    camera_process = multiprocessing.Process(target=capture_frame, args=(process_stop_event, frame_queue))
+#    yolo_process = multiprocessing.Process(target=process_yolo, args=(process_stop_event, csi_count, frame_queue))
 
     csi_capture_process.start()
-    camera_process.start()
-    yolo_process.start()
+#    camera_process.start()
+#    yolo_process.start()
     csi_inference_process.start()
 
     try:
@@ -292,7 +298,7 @@ if __name__ == '__main__':
         print("Processes stopping...")
         process_stop_event.set()
         csi_capture_process.join()
-        camera_process.join()
-        yolo_process.join()
+ #       camera_process.join()
+ #       yolo_process.join()
         csi_inference_process.join()
         print("All processes stopped.")
