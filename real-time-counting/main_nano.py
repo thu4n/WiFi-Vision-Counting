@@ -27,13 +27,13 @@ def check_resources():
     cpu_percent = psutil.cpu_percent(interval=1)
     if cpu_percent > MAX_CPU_PERCENT:
         print(f"CPU usage too high: {cpu_percent}%")
-        sys.exit(1)
+        exit(1)
 
     # Check memory usage
     memory_info = psutil.virtual_memory()
     if memory_info.percent > MAX_MEMORY_PERCENT:
         print(f"Memory usage too high: {memory_info.percent}%")
-        sys.exit(1)
+        exit(1)
 
 '''
 CSI Section 
@@ -62,7 +62,10 @@ def capture_csi(output_file, stop_event, data_ready_event, inference_done_event,
 
             while time.time() - start_time < 2:
                 try:
-                    data = ser.readline().decode("utf-8").strip()
+                    data = ser.readline().decode("utf-8")
+                    if isinstance(data, str):
+                        data = data.strip()
+
                     if data.startswith("CSI_DATA") and data.endswith("]"):
                         timestamp = str(time.time())
                         appended_data = data + ',' + timestamp
