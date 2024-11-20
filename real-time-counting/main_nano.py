@@ -60,30 +60,29 @@ def capture_csi(output_file, stop_event, data_ready_event, inference_done_event,
             start_time = time.time()
             frame = 0
 
-            while time.time() - start_time < 2:
+            while frame != 200:
                 try:
                     data = ser.readline().decode("utf-8").strip()
-                    #if isinstance(data, str):
-                        #data = data.strip()
 
                     if data.startswith("CSI_DATA") and data.endswith("]"):
                         timestamp = str(time.time())
                         appended_data = data + ',' + timestamp
                         data_list = appended_data.split(',')
-                        csv_writer.writerow(data_list)
-                        frame += 1
+                        if(len(data_list) == 27):
+                            csv_writer.writerow(data_list)
+                            frame += 1
 
                         if frame == 1:
                             print("--- Start capturing CSI frames ---")
-                    else:
-                        print("False CSI data")
+
                 except Exception as e:
                     print("CSI Data Writing Exception:", {e})
-                    continue
+                    pass
 
-        data_ready_event.set()
-        inference_done_event.wait()
-        inference_done_event.clear()
+            data_ready_event.set()
+            print("Waiting for inference_done_event")
+            inference_done_event.wait()
+            inference_done_event.clear()
                 
 # Function to load TensorRT engine from a '.engine' file
 def load_engine(engine_file_path):
@@ -143,7 +142,7 @@ def process_csi(output_file, stop_event, data_ready_event, inference_done_event,
                         print("CSI count:", csi_count.value)
             except Exception as e:
                 print("Super exception when reading csv: ", e)
-                continue
+                pass
 
             inference_done_event.set()
     except Exception as e:

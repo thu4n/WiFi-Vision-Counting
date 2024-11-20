@@ -48,6 +48,7 @@ class ESP32:
         raw_csi_data = self.csi_df['CSI_DATA'].copy()
         csi_data = np.array([np.fromstring(csi_datum.strip('[ ]'), dtype=int, sep = ' ') for csi_datum in raw_csi_data])
         self.csi_data = csi_data
+        print("Raw CSI extracted")
         return self
 
     # NOTE: Currently does not provide support for all signal subcarrier types
@@ -63,7 +64,7 @@ class ESP32:
             remove_null_subcarriers = self.NULL_SUBCARRIERS
         else:
             return self
-
+        print("Removing null subcarries")
         csi_data_T = self.csi_data.T
         csi_data_T_clean = np.delete(csi_data_T, remove_null_subcarriers, 0)
         csi_data_clean = csi_data_T_clean.T
@@ -75,8 +76,13 @@ class ESP32:
         """Calculate the Amplitude (or Magnitude) from CSI
         Ref: https://farside.ph.utexas.edu/teaching/315/Waveshtml/node88.html
         """
-        amplitude = np.array([np.sqrt(data[::2]**2 + data[1::2]**2) for data in self.csi_data])
-        self.amplitude = amplitude
+        amplitude = []
+        for data in self.csi_data:
+            if len(data) == 52:
+                amplitude.append(np.sqrt(data[::2]**2 + data[1::2]**2))
+        # amplitude = np.array([np.sqrt(data[::2]**2 + data[1::2]**2) for data in self.csi_data])
+        self.amplitude = np.array(amplitude)
+        print("Amplitude extracted")
         return self
 
 def extract_amplitude(raw_data):
@@ -95,9 +101,13 @@ def denoise_data(amp_df):
         col_series = amp_df[col]
         # Hampel filter
         hampel_filtered = hampel(col_series, window_size=10)
+        if len(hampel_filtered) > 0:
         # Savitzky-Golay filter
-        sg_filtered = savgol_filter(hampel_filtered.filtered_data, window_length=10, polyorder=3)
-        filtered_df[col] = sg_filtered
+            sg_filtered = savgol_filter(hampel_filtered, window_length=11, polyorder=3)
+            filtered_df[col] = sg_filtered
+        else:
+            filtered_df[col] = col_series # If hampel returns nothing, keep the original
+    print("Denoised amplitude")
     return filtered_df
 
 def extract_features(filtered_df_with_rssi):
@@ -134,6 +144,7 @@ def extract_features(filtered_df_with_rssi):
 
     features['euc'] = np.median(euclidean_distances)
     features = pd.DataFrame([features])
+    print("Features extracted")
     return features
 
 def process_csi_from_csv(csi_path):
@@ -146,4 +157,5 @@ def process_csi_from_csv(csi_path):
     temp_df = extract_features(temp_np_array)
     scaler = joblib.load('modelzoo/1611_scaler_fold_2.pkl')
     final_csi_data = scaler.transform(temp_df)
+    print("Data scaled")
     return final_csi_data
