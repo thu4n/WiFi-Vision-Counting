@@ -37,7 +37,6 @@ def capture_csi(output_file, stop_event, data_ready_event, inference_done_event,
     while not stop_event.is_set():
         with open(output_file, mode="w+", newline="") as csvfile:
             csv_writer = csv.writer(csvfile)
-            header = ["CSI_DATA", "Timestamp"]
             csv_writer.writerow(header)
 
             start_time = time.time()
@@ -99,39 +98,26 @@ def csi_inference(engine, h_input, d_input, h_output, d_output, csi_data):
 
     return h_output
 
-def process_csi(output_file, stop_event, data_ready_event, inference_done_event, csi_count):
-    print("CSI Inference Engine: Starting")
+def process_csi(output_file, stop_event, data_ready_event, inference_done_event, csi_count, csi_model, h_input, d_input, h_output, d_output):
+    try:
+        while not stop_event.is_set():
+            print("Waiting for data_ready_event")
+            data_ready_event.wait()
+            data_ready_event.clear()
 
-    csi_engine_path = '/home/thu4n/1611_model_fold_2.trt'
-    if not os.path.exists(csi_engine_path):
-        print("CSI TRT Engine not found")
-        return
-
-    # Load TensorRT engine
-    trt_logger = trt.Logger(trt.Logger.INFO)
-    trt.init_libnvinfer_plugins(trt_logger, '')
-    csi_model = load_engine(csi_engine_path)
-    h_input, d_input, h_output, d_output = allocate_buffers(csi_model)
-    print("CSI Inference Engine: Running")
-
-    while not stop_event.is_set():
-        data_ready_event.wait()
-        data_ready_event.clear()
-
-        with open(output_file, mode="r") as csvfile:
-            csv_reader = csv.reader(csvfile)
-            rows = list(csv_reader)
-            
-            if len(rows) > 1:
-                processed_csi = process_csi_from_csv(output_file)
-                try:
+            with open(output_file, mode="r") as csvfile:
+                csv_reader = csv.reader(csvfile)
+                rows = list(csv_reader)
+                
+                if len(rows) > 1:
+                    processed_csi = process_csi_from_csv(output_file)
                     csi_count_array = csi_inference(csi_model, h_input, d_input, h_output, d_output, processed_csi)
                     csi_count.value = csi_count_array[0][0]
                     print("CSI count:", csi_count.value)
-                except Exception as e:
-                    print("Exception occurred when running CSI inference:", e)
 
-        inference_done_event.set()
+            inference_done_event.set()
+    except Exception as e:
+            print("Exception occurred when processing CSI data::", e)
 '''
 YOLO Section
 '''
@@ -245,6 +231,20 @@ if __name__ == '__main__':
         os.makedirs(output_dir) # Create the folder
     output_file = f"{output_dir}/csi_data.csv" # This file will be continously overwritten
 
+    print("CSI Inference Engine: Starting")
+
+    csi_engine_path = '/home/thu4n/1611_model_fold_2.trt'
+    if not os.path.exists(csi_engine_path):
+        print("CSI TRT Engine not found")
+        exit(1)
+
+    # Load TensorRT engine
+    trt_logger = trt.Logger(trt.Logger.INFO)
+    trt.init_libnvinfer_plugins(trt_logger, '')
+    csi_model = load_engine(csi_engine_path)
+    h_input, d_input, h_output, d_output = allocate_buffers(csi_model)
+    print("CSI Inference Engine: Running")
+
     process_stop_event = multiprocessing.Event()
     csi_data_ready_event = multiprocessing.Event()
     csi_inference_done_event = multiprocessing.Event()
@@ -254,7 +254,8 @@ if __name__ == '__main__':
 
     # Start processes for collecting CSI data, processing YOLO, and combining outputs
     csi_capture_process = multiprocessing.Process(target=capture_csi, args=(output_file, process_stop_event, csi_data_ready_event, csi_inference_done_event ,"/dev/ttyUSB0"))
-    csi_inference_process = multiprocessing.Process(target=process_csi, args=(output_file, process_stop_event, csi_data_ready_event, csi_inference_done_event, csi_count))
+    csi_inference_process = multiprocessing.Process(target=process_csi, args=(output_file, process_stop_event, csi_data_ready_event, csi_inference_done_event,
+                                                                    csi_count, csi_model, h_input, d_input, h_output, d_output))
     camera_process = multiprocessing.Process(target=capture_frame, args=(process_stop_event, frame_queue))
     yolo_process = multiprocessing.Process(target=process_yolo, args=(process_stop_event, csi_count, frame_queue))
 
