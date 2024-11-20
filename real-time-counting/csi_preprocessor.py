@@ -145,11 +145,8 @@ def extract_features(filtered_df_with_rssi):
     return features
 
 def process_csi_from_csv(csi_path):
-    csi_df = pd.read_csv(csi_path)
-    rssi_col = csi_df['rssi']
     raw_amp = extract_amplitude(csi_path)
     filtered_amp = denoise_data(raw_amp)
-    filtered_amp['rssi'] = rssi_col.values[:len(filtered_amp)]
 
     temp_df = filtered_amp.copy()
     temp_np_array = np.array(temp_df) # Turn into numpy array for easier matrix calculation

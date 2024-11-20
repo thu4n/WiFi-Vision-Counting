@@ -117,7 +117,7 @@ def process_csi(output_file, stop_event, data_ready_event, inference_done_event,
 
             inference_done_event.set()
     except Exception as e:
-            print("Exception occurred when processing CSI data::", e)
+            print("Exception occurred when processing CSI data:", e)
 '''
 YOLO Section
 '''
