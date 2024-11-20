@@ -3,7 +3,6 @@ import pandas as pd
 from scipy.signal import savgol_filter
 from hampel import hampel
 import joblib
-#from sklearn.impute import SimpleImputer
 
 class ESP32:
     """Parse ESP32 Wi-Fi Channel State Information (CSI) obtained using ESP32 CSI Toolkit by Hernandez and Bulut.
@@ -53,7 +52,7 @@ class ESP32:
 
     # NOTE: Currently does not provide support for all signal subcarrier types
     def remove_null_subcarriers(self):
-        """Remove NULL subcarriers from CSI
+        """Remove NULL subccodearriers from CSI
         """
 
         # Non-HT Signals (20 Mhz) - non STBC

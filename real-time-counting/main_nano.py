@@ -21,15 +21,7 @@ import tensorrt as trt
 CSI Section 
 '''
 
-# Output directory
-output_dir = f"csi_raw/"
-if not os.path.exists(output_dir): # Check if the folder exists
-    print(f"Creating directory: {output_dir}")
-    os.makedirs(output_dir) # Create the folder
-
-output_file = f"{output_dir}/csi_data.csv" # This file will be continously overwritten
-
-def capture_csi(stop_event, serial_port="/dev/ttyUSB0"):
+def capture_csi(output_file, stop_event, data_ready_event, inference_done_event, serial_port="/dev/ttyUSB0"):
     print("CSI Write Process: Running")
     # ESP specs
     baud_rate = 921600  # Set the baud rate
@@ -42,28 +34,35 @@ def capture_csi(stop_event, serial_port="/dev/ttyUSB0"):
     "ant", "sig_len", "rx_state", "real_time_set", "real_timestamp", "len", 
     "CSI_DATA", "machine_timestamp"
     ]
-    with open(output_file, mode="w+", newline="") as csvfile:
-        csv_writer = csv.writer(csvfile)
-        csv_writer.writerow(header)  
-        while True:
-            start_time = time.time()  # Start time for 2-second window
-            frame = 0 # Initialize the frame counter
+    while not stop_event.is_set():
+        with open(output_file, mode="w+", newline="") as csvfile:
+            csv_writer = csv.writer(csvfile)
+            header = ["CSI_DATA", "Timestamp"]
+            csv_writer.writerow(header)
+
+            start_time = time.time()
+            frame = 0
+
             while time.time() - start_time < 2:
                 try:
                     data = ser.readline().decode("utf-8").strip()
-                    if data.startswith("CSI_DATA") and data.endswith("]"): # Check if the data is a CSI frame
-                        timestamp  = str(time.time())
-                        appended_data = data + ',' + timestamp 
+                    if data.startswith("CSI_DATA") and data.endswith("]"):
+                        timestamp = str(time.time())
+                        appended_data = data + ',' + timestamp
                         data_list = appended_data.split(',')
                         csv_writer.writerow(data_list)
                         frame += 1
 
-                    if frame == 1:
-                        print(f"--- Start capturing CSI frames ---")
+                        if frame == 1:
+                            print("--- Start capturing CSI frames ---")
                 except Exception as e:
-                    print("CSI Data Writing Exception:",{e})
+                    print("CSI Data Writing Exception:", {e})
                     pass
 
+        data_ready_event.set()
+        inference_done_event.wait()
+        inference_done_event.clear()
+                
 # Function to load TensorRT engine from a '.engine' file
 def load_engine(engine_file_path):
     with open(engine_file_path, 'rb') as f, trt.Runtime(trt.Logger(trt.Logger.INFO)) as runtime:
@@ -100,33 +99,39 @@ def csi_inference(engine, h_input, d_input, h_output, d_output, csi_data):
 
     return h_output
 
-def process_csi(stop_event,csi_count):
-    print("CSI Inference Process: Starting")
-    # Path to the TensorRT engine file
+def process_csi(output_file, stop_event, data_ready_event, inference_done_event, csi_count):
+    print("CSI Inference Engine: Starting")
+
     csi_engine_path = '/home/thu4n/1611_model_fold_2.trt'
+    if not os.path.exists(csi_engine_path):
+        print("CSI TRT Engine not found")
+        return
 
     # Load TensorRT engine
     trt_logger = trt.Logger(trt.Logger.INFO)
     trt.init_libnvinfer_plugins(trt_logger, '')
     csi_model = load_engine(csi_engine_path)
     h_input, d_input, h_output, d_output = allocate_buffers(csi_model)
-    print("CSI Inference Process: Running")
+    print("CSI Inference Engine: Running")
+
     while not stop_event.is_set():
+        data_ready_event.wait()
+        data_ready_event.clear()
+
         with open(output_file, mode="r") as csvfile:
             csv_reader = csv.reader(csvfile)
             rows = list(csv_reader)
             
-            if len(rows) > 1:  # Check if there's any new data
-                # Get the latest CSI data from the last 2-second collection
+            if len(rows) > 1:
                 processed_csi = process_csi_from_csv(output_file)
                 try:
                     csi_count_array = csi_inference(csi_model, h_input, d_input, h_output, d_output, processed_csi)
                     csi_count.value = csi_count_array[0][0]
                     print("CSI count:", csi_count.value)
-                except Exception:
-                    print("Exception occured when running CSI inference")
+                except Exception as e:
+                    print("Exception occurred when running CSI inference:", e)
 
-        time.sleep(2)  # Process CSI data every 2 seconds after collecting it
+        inference_done_event.set()
 '''
 YOLO Section
 '''
@@ -232,29 +237,40 @@ def process_yolo(stop_event,csi_count,frame_queue):
     cv2.destroyAllWindows()
 
 if __name__ == '__main__':
-    stop_event = multiprocessing.Event()
+
+    # Output directory
+    output_dir = f"csi_raw/"
+    if not os.path.exists(output_dir): # Check if the folder exists
+        print(f"Creating directory: {output_dir}")
+        os.makedirs(output_dir) # Create the folder
+    output_file = f"{output_dir}/csi_data.csv" # This file will be continously overwritten
+
+    process_stop_event = multiprocessing.Event()
+    csi_data_ready_event = multiprocessing.Event()
+    csi_inference_done_event = multiprocessing.Event()
+
     csi_count = multiprocessing.Value('d', 0.0) # Share count value with YOLO process
     frame_queue = multiprocessing.Queue(maxsize=5) 
 
     # Start processes for collecting CSI data, processing YOLO, and combining outputs
-    csv_process = multiprocessing.Process(target=capture_csi, args=(stop_event, "/dev/ttyUSB0"))
-    csi_process = multiprocessing.Process(target=process_csi, args=(stop_event, csi_count))
-    camera_process = multiprocessing.Process(target=capture_frame, args=(stop_event, frame_queue))
-    yolo_process = multiprocessing.Process(target=process_yolo, args=(stop_event, csi_count, frame_queue))
+    csi_capture_process = multiprocessing.Process(target=capture_csi, args=(output_file, process_stop_event, csi_data_ready_event, csi_inference_done_event ,"/dev/ttyUSB0"))
+    csi_inference_process = multiprocessing.Process(target=process_csi, args=(output_file, process_stop_event, csi_data_ready_event, csi_inference_done_event, csi_count))
+    camera_process = multiprocessing.Process(target=capture_frame, args=(process_stop_event, frame_queue))
+    yolo_process = multiprocessing.Process(target=process_yolo, args=(process_stop_event, csi_count, frame_queue))
 
-    csv_process.start()
+    csi_capture_process.start()
     camera_process.start()
     yolo_process.start()
-    csi_process.start()
+    csi_inference_process.start()
 
     try:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
         print("Processes stopping...")
-        stop_event.set()
-        csv_process.join()
+        process_stop_event.set()
+        csi_capture_process.join()
         camera_process.join()
         yolo_process.join()
-        csi_process.join()
+        csi_inference_process.join()
         print("All processes stopped.")
