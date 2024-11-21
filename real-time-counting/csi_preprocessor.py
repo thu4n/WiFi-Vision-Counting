@@ -76,14 +76,17 @@ class ESP32:
         """Calculate the Amplitude (or Magnitude) from CSI
         Ref: https://farside.ph.utexas.edu/teaching/315/Waveshtml/node88.html
         """
-        amplitude = []
-        for data in self.csi_data:
-            if len(data) == 52:
-                amplitude.append(np.sqrt(data[::2]**2 + data[1::2]**2))
-        # amplitude = np.array([np.sqrt(data[::2]**2 + data[1::2]**2) for data in self.csi_data])
-        self.amplitude = np.array(amplitude)
-        print("Amplitude extracted")
-        return self
+        try:
+            print(self.csi_data.shape())
+            self.amplitude = np.array([np.sqrt(data[::2]**2 + data[1::2]**2) for data in self.csi_data])
+            print("Amplitude:", self.amplitude)
+            # amplitude = np.array([np.sqrt(data[::2]**2 + data[1::2]**2) for data in self.csi_data])
+            print("Amplitude extracted")
+            return self
+        except IndexError as e:
+            print("IndexError:", e)
+            print("Check the structure of self.csi_data")
+            return None
 
 def extract_amplitude(raw_data):
     csi_array = (
