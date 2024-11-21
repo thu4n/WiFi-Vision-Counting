@@ -8,7 +8,7 @@ import model.detector
 import pandas as pd
 import serial
 import csv
-from csi_preprocessor import extract_amplitude, process_csi_from_csv
+from csi_preprocessor import process_csi_from_csv
 import multiprocessing
 import psutil
 
@@ -43,19 +43,19 @@ def capture_csi(output_file, stop_event, data_ready_event, inference_done_event,
     print("CSI Write Process: Running")
     # ESP specs
     baud_rate = 921600  # Set the baud rate
-    ser = serial.Serial(serial_port, baudrate=baud_rate, timeout=0.1) # Configure the serial port
+    ser = serial.Serial(serial_port, baudrate=baud_rate, timeout=1) # Configure the serial port
    
-    # header = [
-    # "type", "role", "mac", "rssi", "rate", "sig_mode", "mcs", "bandwidth", 
-    # "smoothing", "not_sounding", "aggregation", "stbc", "fec_coding", "sgi", 
-    # "noise_floor", "ampdu_cnt", "channel", "secondary_channel", "local_timestamp", 
-    # "ant", "sig_len", "rx_state", "real_time_set", "real_timestamp", "len", 
-    # "CSI_DATA", "machine_timestamp"
-    # ]
+    header = [
+    "type", "role", "mac", "rssi", "rate", "sig_mode", "mcs", "bandwidth", 
+    "smoothing", "not_sounding", "aggregation", "stbc", "fec_coding", "sgi", 
+    "noise_floor", "ampdu_cnt", "channel", "secondary_channel", "local_timestamp", 
+    "ant", "sig_len", "rx_state", "real_time_set", "real_timestamp", "len", 
+    "CSI_DATA", "machine_timestamp"
+    ]
     while not stop_event.is_set():
         with open(output_file, mode="w+", newline="") as csvfile:
             csv_writer = csv.writer(csvfile)
-            # csv_writer.writerow(header)
+            csv_writer.writerow(header)
 
             start_time = time.time()
             frame = 0
@@ -65,12 +65,17 @@ def capture_csi(output_file, stop_event, data_ready_event, inference_done_event,
                     data = ser.readline().decode("utf-8").strip()
 
                     if data.startswith("CSI_DATA") and data.endswith("]"):
-                        raw_amp = extract_amplitude(data)
-                        csv_writer.writerow(raw_amp)
-                        frame += 1
+                        timestamp = str(time.time())
+                        appended_data = data + ',' + timestamp
+                        data_list = appended_data.split(',')
+                        if(len(data_list) == 27):
+                            csv_writer.writerow(data_list)
+                            frame += 1
 
                         if frame == 1:
                             print("--- Start capturing CSI frames ---")
+                        if frame == 200:
+                            print("Full")
 
                 except Exception as e:
                     print("CSI Data Writing Exception:", {e})
@@ -99,11 +104,9 @@ def allocate_buffers(engine):
     return h_input, d_input, h_output, d_output
 
 # Function to perform inference with TensorRT engine
-def csi_inference(engine, h_input, d_input, h_output, d_output, csi_data):
+def csi_inference(engine, h_input, d_input, h_output, d_output, csi_data, stream):
     print("Running actual inference")
     check_resources()
-
-    stream = cuda.Stream()
     
     np.copyto(h_input, csi_data.ravel())
 
@@ -120,7 +123,7 @@ def csi_inference(engine, h_input, d_input, h_output, d_output, csi_data):
 
     return h_output
 
-def process_csi(output_file, stop_event, data_ready_event, inference_done_event, csi_count, csi_model, h_input, d_input, h_output, d_output):
+def process_csi(output_file, stop_event, data_ready_event, inference_done_event, csi_count, csi_model, h_input, d_input, h_output, d_output, stream):
     try:
         while not stop_event.is_set():
             print("Waiting for data_ready_event")
@@ -134,7 +137,7 @@ def process_csi(output_file, stop_event, data_ready_event, inference_done_event,
                     
                     if len(rows) > 1:
                         processed_csi = process_csi_from_csv(output_file)
-                        csi_count_array = csi_inference(csi_model, h_input, d_input, h_output, d_output, processed_csi)
+                        csi_count_array = csi_inference(csi_model, h_input, d_input, h_output, d_output, processed_csi, stream)
                         csi_count.value = csi_count_array[0][0]
                         print("CSI count:", csi_count.value)
             except Exception as e:
@@ -265,6 +268,8 @@ if __name__ == '__main__':
     trt.init_libnvinfer_plugins(trt_logger, '')
     csi_model = load_engine(csi_engine_path)
     h_input, d_input, h_output, d_output = allocate_buffers(csi_model)
+    stream = cuda.Stream()
+
     print("CSI Inference Engine: Running")
 
     process_stop_event = multiprocessing.Event()
@@ -277,7 +282,7 @@ if __name__ == '__main__':
     # Start processes for collecting CSI data, processing YOLO, and combining outputs
     csi_capture_process = multiprocessing.Process(target=capture_csi, args=(output_file, process_stop_event, csi_data_ready_event, csi_inference_done_event ,"/dev/ttyUSB0"))
     csi_inference_process = multiprocessing.Process(target=process_csi, args=(output_file, process_stop_event, csi_data_ready_event, csi_inference_done_event,
-                                                                    csi_count, csi_model, h_input, d_input, h_output, d_output))
+                                                                    csi_count, csi_model, h_input, d_input, h_output, d_output, stream))
 #    camera_process = multiprocessing.Process(target=capture_frame, args=(process_stop_event, frame_queue))
 #    yolo_process = multiprocessing.Process(target=process_yolo, args=(process_stop_event, csi_count, frame_queue))
 
