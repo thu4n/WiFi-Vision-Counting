@@ -3,6 +3,7 @@ import pandas as pd
 from scipy.signal import savgol_filter
 from hampel import hampel
 import joblib
+import math
 
 class ESP32:
     """Parse ESP32 Wi-Fi Channel State Information (CSI) obtained using ESP32 CSI Toolkit by Hernandez and Bulut.
@@ -89,14 +90,29 @@ class ESP32:
             return None
 
 def extract_amplitude(raw_data):
-    csi_array = (
-        ESP32(raw_data)
-            .get_csi()
-            .remove_null_subcarriers()
-            .get_amplitude_from_csi()
-    )
-    amp_df = pd.DataFrame(csi_array.amplitude, index=None)
-    return amp_df
+   # Parser
+    all_data = raw_data.split(',')
+    csi_data = all_data[25].split(" ")
+    csi_data[0] = csi_data[0].replace("[", "")
+    csi_data[-1] = csi_data[-1].replace("]", "")
+
+    csi_data.pop()
+    csi_data = [int(c) for c in csi_data if c]
+    imaginary = []
+    real = []
+    for i, val in enumerate(csi_data):
+        if i % 2 == 0:
+            imaginary.append(val)
+        else:
+            real.append(val)
+
+    csi_size = len(csi_data)
+    amplitudes = []
+    if len(imaginary) > 0 and len(real) > 0:
+        for j in range(int(csi_size / 2)):
+            amplitude_calc = math.sqrt(imaginary[j] ** 2 + real[j] ** 2)
+            amplitudes.append(amplitude_calc)
+    return amplitudes
 
 def denoise_data(amp_df):
     filtered_df = pd.DataFrame()
@@ -151,7 +167,7 @@ def extract_features(filtered_df_with_rssi):
     return features
 
 def process_csi_from_csv(csi_path):
-    raw_amp = extract_amplitude(csi_path)
+    raw_amp = pd.read_csv(csi_path)
     filtered_amp = denoise_data(raw_amp)
 
     temp_df = filtered_amp.copy()

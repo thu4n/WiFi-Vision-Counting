@@ -8,7 +8,7 @@ import model.detector
 import pandas as pd
 import serial
 import csv
-from csi_preprocessor import process_csi_from_csv
+from csi_preprocessor import extract_amplitude, process_csi_from_csv
 import multiprocessing
 import psutil
 
@@ -45,17 +45,17 @@ def capture_csi(output_file, stop_event, data_ready_event, inference_done_event,
     baud_rate = 921600  # Set the baud rate
     ser = serial.Serial(serial_port, baudrate=baud_rate, timeout=0.1) # Configure the serial port
    
-    header = [
-    "type", "role", "mac", "rssi", "rate", "sig_mode", "mcs", "bandwidth", 
-    "smoothing", "not_sounding", "aggregation", "stbc", "fec_coding", "sgi", 
-    "noise_floor", "ampdu_cnt", "channel", "secondary_channel", "local_timestamp", 
-    "ant", "sig_len", "rx_state", "real_time_set", "real_timestamp", "len", 
-    "CSI_DATA", "machine_timestamp"
-    ]
+    # header = [
+    # "type", "role", "mac", "rssi", "rate", "sig_mode", "mcs", "bandwidth", 
+    # "smoothing", "not_sounding", "aggregation", "stbc", "fec_coding", "sgi", 
+    # "noise_floor", "ampdu_cnt", "channel", "secondary_channel", "local_timestamp", 
+    # "ant", "sig_len", "rx_state", "real_time_set", "real_timestamp", "len", 
+    # "CSI_DATA", "machine_timestamp"
+    # ]
     while not stop_event.is_set():
         with open(output_file, mode="w+", newline="") as csvfile:
             csv_writer = csv.writer(csvfile)
-            csv_writer.writerow(header)
+            # csv_writer.writerow(header)
 
             start_time = time.time()
             frame = 0
@@ -65,12 +65,9 @@ def capture_csi(output_file, stop_event, data_ready_event, inference_done_event,
                     data = ser.readline().decode("utf-8").strip()
 
                     if data.startswith("CSI_DATA") and data.endswith("]"):
-                        timestamp = str(time.time())
-                        appended_data = data + ',' + timestamp
-                        data_list = appended_data.split(',')
-                        if(len(data_list) == 27):
-                            csv_writer.writerow(data_list)
-                            frame += 1
+                        raw_amp = extract_amplitude(data)
+                        csv_writer.writerow(raw_amp)
+                        frame += 1
 
                         if frame == 1:
                             print("--- Start capturing CSI frames ---")
