@@ -104,26 +104,26 @@ def allocate_buffers(engine):
     return h_input, d_input, h_output, d_output
 
 # Function to perform inference with TensorRT engine
-def csi_inference(engine, h_input, d_input, h_output, d_output, csi_data, stream):
+def csi_inference(engine, h_input, d_input, h_output, d_output, csi_data):
     print("Running actual inference")
     check_resources()
-    
-    np.copyto(h_input, csi_data.ravel())
+    with cuda.Stream() as stream:
+        np.copyto(h_input, csi_data.ravel())
 
-    # Copy input data to the device
-    cuda.memcpy_htod_async(d_input, h_input, stream)
+        # Copy input data to the device
+        cuda.memcpy_htod_async(d_input, h_input, stream)
 
-    # Run inference
-    with engine.create_execution_context() as context:
-        context.execute_async(bindings=[int(d_input), int(d_output)], stream_handle=stream.handle)
-    
-    # Copy output data to the host
-    cuda.memcpy_dtoh_async(h_output, d_output, stream)
-    stream.synchronize()
+        # Run inference
+        with engine.create_execution_context() as context:
+            context.execute_async(bindings=[int(d_input), int(d_output)], stream_handle=stream.handle)
+        
+        # Copy output data to the host
+        cuda.memcpy_dtoh_async(h_output, d_output, stream)
+        stream.synchronize()
 
     return h_output
 
-def process_csi(output_file, stop_event, data_ready_event, inference_done_event, csi_count, csi_model, h_input, d_input, h_output, d_output, stream):
+def process_csi(output_file, stop_event, data_ready_event, inference_done_event, csi_count, csi_model, h_input, d_input, h_output, d_output):
     try:
         while not stop_event.is_set():
             print("Waiting for data_ready_event")
@@ -137,9 +137,22 @@ def process_csi(output_file, stop_event, data_ready_event, inference_done_event,
                     
                     if len(rows) > 1:
                         processed_csi = process_csi_from_csv(output_file)
-                        csi_count_array = csi_inference(csi_model, h_input, d_input, h_output, d_output, processed_csi, stream)
-                        csi_count.value = csi_count_array[0][0]
-                        print("CSI count:", csi_count.value)
+                        with cuda.Stream() as stream:
+                            np.copyto(h_input, processed_csi.ravel())
+
+                            # Copy input data to the device
+                            cuda.memcpy_htod_async(d_input, h_input, stream)
+
+                            # Run inference
+                            with engine.create_execution_context() as context:
+                                context.execute_async(bindings=[int(d_input), int(d_output)], stream_handle=stream.handle)
+                            
+                            # Copy output data to the host
+                            cuda.memcpy_dtoh_async(h_output, d_output, stream)
+                            stream.synchronize()
+                    # csi_count_array = csi_inference(csi_model, h_input, d_input, h_output, d_output, processed_csi)
+                            csi_count.value = h_output[0][0]
+                            print("CSI count:", csi_count.value)
             except Exception as e:
                 print("Super exception when reading csv: ", e)
                 pass
@@ -268,7 +281,7 @@ if __name__ == '__main__':
     trt.init_libnvinfer_plugins(trt_logger, '')
     csi_model = load_engine(csi_engine_path)
     h_input, d_input, h_output, d_output = allocate_buffers(csi_model)
-    stream = cuda.Stream()
+    #stream = cuda.Stream()
 
     print("CSI Inference Engine: Running")
 
@@ -282,7 +295,7 @@ if __name__ == '__main__':
     # Start processes for collecting CSI data, processing YOLO, and combining outputs
     csi_capture_process = multiprocessing.Process(target=capture_csi, args=(output_file, process_stop_event, csi_data_ready_event, csi_inference_done_event ,"/dev/ttyUSB0"))
     csi_inference_process = multiprocessing.Process(target=process_csi, args=(output_file, process_stop_event, csi_data_ready_event, csi_inference_done_event,
-                                                                    csi_count, csi_model, h_input, d_input, h_output, d_output, stream))
+                                                                    csi_count, csi_model, h_input, d_input, h_output, d_output))
 #    camera_process = multiprocessing.Process(target=capture_frame, args=(process_stop_event, frame_queue))
 #    yolo_process = multiprocessing.Process(target=process_yolo, args=(process_stop_event, csi_count, frame_queue))
 

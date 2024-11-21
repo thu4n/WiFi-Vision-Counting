@@ -87,7 +87,6 @@ class ESP32:
         """
         try:
             self.amplitude = np.array([np.sqrt(data[::2]**2 + data[1::2]**2) for data in self.csi_data])
-            print("Amplitude:", self.amplitude)
             # amplitude = np.array([np.sqrt(data[::2]**2 + data[1::2]**2) for data in self.csi_data])
             print("Amplitude extracted")
             return self
