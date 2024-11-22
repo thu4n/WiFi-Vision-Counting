@@ -21,16 +21,16 @@ import tensorrt as trt
 MAX_CPU_PERCENT = 85  # Maximum CPU usage percentage
 MAX_MEMORY_PERCENT = 85  # Maximum memory usage percentage
 
-def check_resources():
+def check_resources(logger):
     # Check CPU usage
     cpu_percent = psutil.cpu_percent(interval=1)
-    print(f"CPU usage: {cpu_percent}%")
+    logger.info(f"CPU usage: {cpu_percent}%")
     if cpu_percent > MAX_CPU_PERCENT:
        sys.exit(1)
 
     # Check memory usage
     memory_info = psutil.virtual_memory()
-    print(f"Memory usage: {memory_info.percent}%")
+    logger.info(f"Memory usage: {memory_info.percent}%")
     if memory_info.percent > MAX_MEMORY_PERCENT:
        sys.exit(1)
 
@@ -97,18 +97,15 @@ def allocate_buffers(engine):
     return h_input, d_input, h_output, d_output
 
 # Function to perform inference with TensorRT engine
-def csi_inference(engine, h_input, d_input, h_output, d_output, csi_data):
+def csi_inference(stream, context, h_input, d_input, h_output, d_output, csi_data):
     print("Running actual inference")
-    check_resources()
-    stream = cuda.Stream()
     np.copyto(h_input, csi_data.ravel())
 
     # Copy input data to the device
     cuda.memcpy_htod_async(d_input, h_input, stream)
 
     # Run inference
-    with engine.create_execution_context() as context:
-        context.execute_async(bindings=[int(d_input), int(d_output)], stream_handle=stream.handle)
+    context.execute_async(bindings=[int(d_input), int(d_output)], stream_handle=stream.handle)
     
     # Copy output data to the host
     cuda.memcpy_dtoh_async(h_output, d_output, stream)
@@ -129,7 +126,7 @@ if __name__ == '__main__':
 
     # Load TensorRT engine
     print("CSI Inference Engine: Starting")
-    csi_engine_path = '/home/thu4n/1611_model_fold_2.trt'
+    csi_engine_path = 'modelzoo/2111_model_fold_2.trt'
 
     if not os.path.exists(csi_engine_path):
         print("CSI TRT Engine not found")
@@ -139,6 +136,8 @@ if __name__ == '__main__':
     trt.init_libnvinfer_plugins(trt_logger, '')
     csi_model = load_engine(csi_engine_path)
     h_input, d_input, h_output, d_output = allocate_buffers(csi_model)
+    context = csi_model.create_execution_context()
+    stream = cuda.Stream()
 
     print("CSI Inference Engine: Running")
 
@@ -156,7 +155,6 @@ if __name__ == '__main__':
                 print("Waiting for data_ready_event")
                 csi_data_ready_event.wait()
                 csi_data_ready_event.clear()
-                check_resources()
                 try:
                     with open(output_file, mode="r") as csvfile:
                         csv_reader = csv.reader(csvfile)
@@ -165,10 +163,11 @@ if __name__ == '__main__':
                         if len(rows) > 1:
                             start = time.perf_counter()
                             processed_csi = process_csi_from_csv(output_file)
-                            pred = csi_inference(csi_model, h_input, d_input, h_output, d_output, processed_csi)
+                            pred = csi_inference(stream, context, h_input, d_input, h_output, d_output, processed_csi)
                             end = time.perf_counter()
                             logger.info(f"Inference time (preprocessing included): {(end - start) * 1000:.2f} ms")
                             logger.info(f"CSI count: {pred}")
+                            check_resources(logger)
                 except Exception as e:
                     print("Super exception when reading csv: ", e)
                     pass
