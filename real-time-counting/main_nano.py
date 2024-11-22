@@ -16,7 +16,6 @@ import sys
 # Nano specific libs
 import pycuda.driver as cuda
 import pycuda.autoinit
-import numpy as np
 import tensorrt as trt
 
 # Define resource limits
@@ -27,13 +26,13 @@ def check_resources():
     # Check CPU usage
     cpu_percent = psutil.cpu_percent(interval=1)
     print(f"CPU usage: {cpu_percent}%")
-   if cpu_percent > MAX_CPU_PERCENT:
+    if cpu_percent > MAX_CPU_PERCENT:
        sys.exit(1)
 
     # Check memory usage
     memory_info = psutil.virtual_memory()
     print(f"Memory usage: {memory_info.percent}%")
-   if memory_info.percent > MAX_MEMORY_PERCENT:
+    if memory_info.percent > MAX_MEMORY_PERCENT:
        sys.exit(1)
 
 '''

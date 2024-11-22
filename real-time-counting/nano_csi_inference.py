@@ -9,12 +9,10 @@ import threading
 import psutil
 import sys
 from info_logger import info_logger
-import datetime
 
 # Nano specific libs
 import pycuda.driver as cuda
 import pycuda.autoinit
-import numpy as np
 import tensorrt as trt
 
 # Define resource limits
