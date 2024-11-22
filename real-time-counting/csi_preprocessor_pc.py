@@ -63,9 +63,6 @@ class ESP32:
     def remove_null_subcarriers(self):
         """Remove NULL subcarriers from CSI
         """
-        print("Check shape for null")
-        print(type(self.csi_data[0]))
-        print(len(self.csi_data[0]))
         # Non-HT Signals (20 Mhz) - non STBC
         if self.csi_data.shape[1] == 128:
             remove_null_subcarriers = self.NULL_SUBCARRIERS[:24]
