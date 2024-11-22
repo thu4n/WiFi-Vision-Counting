@@ -11,6 +11,7 @@ import csv
 from csi_preprocessor_nano import process_csi_from_csv
 import multiprocessing
 import psutil
+import sys
 
 # Nano specific libs
 import pycuda.driver as cuda
@@ -25,15 +26,15 @@ MAX_MEMORY_PERCENT = 85  # Maximum memory usage percentage
 def check_resources():
     # Check CPU usage
     cpu_percent = psutil.cpu_percent(interval=1)
-    if cpu_percent > MAX_CPU_PERCENT:
-        print(f"CPU usage too high: {cpu_percent}%")
-        exit(1)
+    print(f"CPU usage: {cpu_percent}%")
+   if cpu_percent > MAX_CPU_PERCENT:
+       sys.exit(1)
 
     # Check memory usage
     memory_info = psutil.virtual_memory()
-    if memory_info.percent > MAX_MEMORY_PERCENT:
-        print(f"Memory usage too high: {memory_info.percent}%")
-        exit(1)
+    print(f"Memory usage: {memory_info.percent}%")
+   if memory_info.percent > MAX_MEMORY_PERCENT:
+       sys.exit(1)
 
 '''
 CSI Section 
@@ -60,7 +61,7 @@ def capture_csi(output_file, stop_event, data_ready_event, inference_done_event,
             start_time = time.time()
             frame = 0
 
-            while frame != 200:
+            while time.time() - start_time < 2:
                 try:
                     data = ser.readline().decode("utf-8").strip()
 
@@ -107,59 +108,22 @@ def allocate_buffers(engine):
 def csi_inference(engine, h_input, d_input, h_output, d_output, csi_data):
     print("Running actual inference")
     check_resources()
-    with cuda.Stream() as stream:
-        np.copyto(h_input, csi_data.ravel())
+    stream = cuda.Stream()
+    np.copyto(h_input, csi_data.ravel())
 
-        # Copy input data to the device
-        cuda.memcpy_htod_async(d_input, h_input, stream)
+    # Copy input data to the device
+    cuda.memcpy_htod_async(d_input, h_input, stream)
 
-        # Run inference
-        with engine.create_execution_context() as context:
-            context.execute_async(bindings=[int(d_input), int(d_output)], stream_handle=stream.handle)
-        
-        # Copy output data to the host
-        cuda.memcpy_dtoh_async(h_output, d_output, stream)
-        stream.synchronize()
+    # Run inference
+    with engine.create_execution_context() as context:
+        context.execute_async(bindings=[int(d_input), int(d_output)], stream_handle=stream.handle)
+    
+    # Copy output data to the host
+    cuda.memcpy_dtoh_async(h_output, d_output, stream)
+    stream.synchronize()
 
     return h_output
 
-def process_csi(output_file, stop_event, data_ready_event, inference_done_event, csi_count, csi_model, h_input, d_input, h_output, d_output):
-    try:
-        while not stop_event.is_set():
-            print("Waiting for data_ready_event")
-            data_ready_event.wait()
-            data_ready_event.clear()
-            check_resources()
-            try:
-                with open(output_file, mode="r") as csvfile:
-                    csv_reader = csv.reader(csvfile)
-                    rows = list(csv_reader)
-                    
-                    if len(rows) > 1:
-                        processed_csi = process_csi_from_csv(output_file)
-                        with cuda.Stream() as stream:
-                            np.copyto(h_input, processed_csi.ravel())
-
-                            # Copy input data to the device
-                            cuda.memcpy_htod_async(d_input, h_input, stream)
-
-                            # Run inference
-                            with engine.create_execution_context() as context:
-                                context.execute_async(bindings=[int(d_input), int(d_output)], stream_handle=stream.handle)
-                            
-                            # Copy output data to the host
-                            cuda.memcpy_dtoh_async(h_output, d_output, stream)
-                            stream.synchronize()
-                    # csi_count_array = csi_inference(csi_model, h_input, d_input, h_output, d_output, processed_csi)
-                            csi_count.value = h_output[0][0]
-                            print("CSI count:", csi_count.value)
-            except Exception as e:
-                print("Super exception when reading csv: ", e)
-                pass
-
-            inference_done_event.set()
-    except Exception as e:
-            print("Exception occurred when processing CSI data:", e)
 '''
 YOLO Section
 '''
@@ -168,7 +132,7 @@ def gstreamer_pipeline(
     capture_height=720,
     display_width=1280,
     display_height=720,
-    framerate=15,
+    framerate=60,
     flip_method=0,
 ):
     return (
@@ -223,7 +187,7 @@ def process_yolo(stop_event,csi_count,frame_queue):
             end = time.perf_counter()
             print(f"Inference time: {(end - start) * 1000:.2f} ms")
 
-            # Process predictions
+            # Procescsi_data_ready_events predictions
             output = utils.utils.handel_preds(preds, cfg, device)
             output_boxes = utils.utils.non_max_suppression(output, conf_thres=0.3, iou_thres=0.4)
 
@@ -281,7 +245,6 @@ if __name__ == '__main__':
     trt.init_libnvinfer_plugins(trt_logger, '')
     csi_model = load_engine(csi_engine_path)
     h_input, d_input, h_output, d_output = allocate_buffers(csi_model)
-    #stream = cuda.Stream()
 
     print("CSI Inference Engine: Running")
 
@@ -292,27 +255,50 @@ if __name__ == '__main__':
     csi_count = multiprocessing.Value('d', 0.0) # Share count value with YOLO process
     frame_queue = multiprocessing.Queue(maxsize=5) 
 
+    cfg = utils.utils.load_datafile('./data/coco.data')
+    model_path = 'modelzoo/yolofv2-nano-190-epoch-0.953577ap-model.pth'
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    yolo_model = model.detector.Detector(cfg["classes"], cfg["anchor_num"], True).to(device)
+    yolo_model.load_state_dict(torch.load(model_path, map_location=device))
+    check_resources()
+    yolo_model.eval()
+    check_resources()
     # Start processes for collecting CSI data, processing YOLO, and combining outputs
     csi_capture_process = multiprocessing.Process(target=capture_csi, args=(output_file, process_stop_event, csi_data_ready_event, csi_inference_done_event ,"/dev/ttyUSB0"))
-    csi_inference_process = multiprocessing.Process(target=process_csi, args=(output_file, process_stop_event, csi_data_ready_event, csi_inference_done_event,
-                                                                    csi_count, csi_model, h_input, d_input, h_output, d_output))
-#    camera_process = multiprocessing.Process(target=capture_frame, args=(process_stop_event, frame_queue))
-#    yolo_process = multiprocessing.Process(target=process_yolo, args=(process_stop_event, csi_count, frame_queue))
+    camera_process = multiprocessing.Process(target=capture_frame, args=(process_stop_event, frame_queue))
+    yolo_process = multiprocessing.Process(target=process_yolo, args=(process_stop_event, csi_count, frame_queue))
 
     csi_capture_process.start()
-#    camera_process.start()
-#    yolo_process.start()
-    csi_inference_process.start()
+    camera_process.start()
+    yolo_process.start()
 
     try:
         while True:
-            time.sleep(1)
-            check_resources()
+            try:
+                print("Waiting for data_ready_event")
+                csi_data_ready_event.wait()
+                csi_data_ready_event.clear()
+                check_resources()
+                try:
+                    with open(output_file, mode="r") as csvfile:
+                        csv_reader = csv.reader(csvfile)
+                        rows = list(csv_reader)
+                        
+                        if len(rows) > 1:
+                            processed_csi = process_csi_from_csv(output_file)
+                            pred = csi_inference(csi_model, h_input, d_input, h_output, d_output, processed_csi)
+                            print("CSI count:", pred)
+                except Exception as e:
+                    print("Super exception when reading csv: ", e)
+                    pass
+
+                csi_inference_done_event.set()
+            except Exception as e:
+                    print("Exception occurred when processing CSI data:", e)
     except KeyboardInterrupt:
         print("Processes stopping...")
         process_stop_event.set()
         csi_capture_process.join()
- #       camera_process.join()
- #       yolo_process.join()
-        csi_inference_process.join()
+        camera_process.join()
+        yolo_process.join()
         print("All processes stopped.")

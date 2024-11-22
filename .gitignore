@@ -1,2 +1,5 @@
 real-time-counting/venv
 real-time-counting/__pycache__
+real-time-counting/model/__pycache__/
+real-time-counting/model/backbone/__pycache__/
+real-time-counting/utils/__pycache__/

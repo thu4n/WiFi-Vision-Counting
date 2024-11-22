@@ -54,7 +54,6 @@ class ESP32:
         csi_data = np.array([np.fromstring(csi_datum.strip('[ ]'), dtype=int, sep = ' ') for csi_datum in raw_csi_data])
         csi_data = [csi_datum for csi_datum in csi_data if len(csi_datum) == 128]
         self.csi_data = np.array(csi_data)
-        print("Raw CSI extracted: ", self.csi_data.shape)
 
         return self
 
@@ -62,9 +61,6 @@ class ESP32:
     def remove_null_subcarriers(self):
         """Remove NULL subccodearriers from CSI
         """
-        print("Check shape for null")
-        print(type(self.csi_data[0]))
-        print(len(self.csi_data[0]))
         # Non-HT Signals (20 Mhz) - non STBC
         if self.csi_data.shape[1] == 128:
             remove_null_subcarriers = self.NULL_SUBCARRIERS[:24]
@@ -107,7 +103,6 @@ def extract_amplitude(raw_data):
 
 def denoise_data(amp_df):
     filtered_df = pd.DataFrame()
-    print("Extracting....")
     for col in amp_df.columns:
         col_series = amp_df[col]
         # Hampel filter

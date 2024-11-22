@@ -44,7 +44,7 @@ def inference(engine, h_input, d_input, h_output, d_output):
 
 if __name__ == '__main__':
     # Path to the TensorRT engine file
-    engine_file_path = '1611_model_fold_2.trt'
+    engine_file_path = '/home/thu4n/1611_model_fold_2.trt'
 
     # Load TensorRT engine
     trt_logger = trt.Logger(trt.Logger.INFO)
@@ -56,8 +56,9 @@ if __name__ == '__main__':
 
     # Perform inference
     output_result = inference(engine, h_input, d_input, h_output, d_output)
-
     # Print the inference result
     print("Inference Result:")
-    print(output_result)
+    print(output_result[0])
+    print(type(output_result))
+
 
