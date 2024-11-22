@@ -8,7 +8,7 @@ import model.detector
 import pandas as pd
 import serial
 import csv
-from csi_preprocessor import process_csi_from_csv
+from csi_preprocessor_nano import process_csi_from_csv
 import multiprocessing
 import psutil
 
