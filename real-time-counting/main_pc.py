@@ -9,7 +9,7 @@ import tensorflow as tf
 import pandas as pd
 import serial
 import csv
-from csi_preprocessor import process_csi_from_csv
+from csi_preprocessor_pc import process_csi_from_csv
 import threading
 
 # Output directory
