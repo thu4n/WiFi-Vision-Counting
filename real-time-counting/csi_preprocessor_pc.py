@@ -3,7 +3,6 @@ import pandas as pd
 from scipy.signal import savgol_filter
 from hampel import hampel
 import joblib
-from sklearn.impute import SimpleImputer
 
 class ESP32:
     """Parse ESP32 Wi-Fi Channel State Information (CSI) obtained using ESP32 CSI Toolkit by Hernandez and Bulut.
@@ -117,9 +116,9 @@ def denoise_data(amp_df):
     for col in amp_df.columns:
         col_series = amp_df[col]
         # Hampel filter
-        hampel_filtered = hampel(col_series, window_size=10, imputation=True)
+        hampel_filtered = hampel(col_series, window_size=10)
         # Savitzky-Golay filter
-        sg_filtered = savgol_filter(hampel_filtered, window_length=11, polyorder=3)
+        sg_filtered = savgol_filter(hampel_filtered.filtered_data, window_length=10, polyorder=3)
         filtered_df[col] = sg_filtered
     print("Denoised amplitude")
     return filtered_df
@@ -169,7 +168,7 @@ def process_csi_from_csv(csi_path):
     temp_np_array = np.array(temp_df) # Turn into numpy array for easier matrix calculation
 
     temp_df = extract_features(temp_np_array)
-    scaler = joblib.load('modelzoo/2111_scaler_fold_2.pkl')
+    scaler = joblib.load('modelzoo/1611_scaler_fold_2.pkl')
     final_csi_data = scaler.transform(temp_df)
     print("Data scaled")
     return final_csi_data
