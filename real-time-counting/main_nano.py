@@ -122,6 +122,14 @@ def csi_inference(stream, context, h_input, d_input, h_output, d_output, csi_dat
 '''
 YOLO Section
 '''
+
+def check_dark_frame(image):
+    gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    brightness = np.mean(gray_image)
+    if brightness < 50:
+        return True
+    return False
+
 def gstreamer_pipeline(
     capture_width=1280,
     capture_height=720,
@@ -176,6 +184,7 @@ def process_yolo(stop_event,csi_count,frame_queue, logger):
             res_img = cv2.resize(frame, (cfg["width"], cfg["height"]), interpolation=cv2.INTER_LINEAR)
             img = res_img.reshape(1, cfg["height"], cfg["width"], 3)
             img = torch.from_numpy(img.transpose(0, 3, 1, 2)).to(device).float() / 255.0
+            is_dark = check_dark_frame(img)
 
             # Model inference
             start = time.perf_counter()
@@ -212,9 +221,11 @@ def process_yolo(stop_event,csi_count,frame_queue, logger):
                 except:
                     continue
             print("------------Prediction------------")
+            
             logger.info(f"CV count: {cv_count}")
             logger.info(f"CSI count: {csi_count.value}")
-
+            combined_count = calculate_combined_count(is_dark, cv_count, csi_count.value)
+            logger.info(f"Combined CV + CSI count: {combined_count}")
             # Display result
             #cv2.imshow("CSI Camera Detection", frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -223,6 +234,19 @@ def process_yolo(stop_event,csi_count,frame_queue, logger):
         #time.sleep(2)
 
     cv2.destroyAllWindows()
+
+'''
+Shared section
+'''
+
+def calculate_combined_count(is_dark, cv_count, csi_count):
+    cv_weight = 0.6
+    csi_weight = 0.4   
+    if is_dark:
+        cv_weight = 0.3
+        csi_weight = 0.7
+    combined_count = cv_weight * cv_count + csi_weight * csi_count
+    return combined_count
 
 if __name__ == '__main__':
 
