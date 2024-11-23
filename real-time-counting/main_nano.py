@@ -153,7 +153,7 @@ def capture_frame(stop_event, frame_queue, logger):
         #time.sleep(0.2) # Let the nano breathe a little bit
     cap.release()
 
-def process_yolo(stop_event,csi_count,frame_queue, logger):
+def process_yolo(stop_event,csi_count,frame_queue, logger, output_dir):
     print("YOLO Process: Running")
     # Load configuration and model
     cfg = utils.utils.load_datafile('./data/coco.data')
@@ -211,6 +211,7 @@ def process_yolo(stop_event,csi_count,frame_queue, logger):
                     cv2.putText(frame, f"CSI count: {csi_count.value}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
                 except:
                     continue
+            save_image(frame, output_dir) # Save image to disk
             print("------------Prediction------------")
             logger.info(f"CV count: {cv_count}")
             logger.info(f"CSI count: {csi_count.value}")
@@ -224,7 +225,22 @@ def process_yolo(stop_event,csi_count,frame_queue, logger):
 
     cv2.destroyAllWindows()
 
+def clean_image_dir(output_dir):
+    if os.path.exists(output_dir):
+        print(f"Cleaning directory: {output_dir}")
+        files = os.listdir(output_dir)
+        for file in files:
+            os.remove(f"{output_dir}/{file}")
+
+def save_image(frame, output_dir):
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    cv2.imwrite(f"{output_dir}/frame_{time.time()}.jpg", frame)
+
 if __name__ == '__main__':
+    # Output image
+    result_dir = "results/"
+    clean_image_dir(result_dir)
 
     # Output directory
     output_dir = f"csi_raw/"
@@ -261,7 +277,7 @@ if __name__ == '__main__':
     # Start processes for collecting CSI data, processing YOLO, and combining outputs
     csi_capture_process = multiprocessing.Process(target=capture_csi, args=(output_file, process_stop_event, csi_data_ready_event, csi_inference_done_event ,"/dev/ttyUSB0"))
     camera_process = multiprocessing.Process(target=capture_frame, args=(process_stop_event, frame_queue, logger))
-    yolo_process = multiprocessing.Process(target=process_yolo, args=(process_stop_event, csi_count, frame_queue, logger))
+    yolo_process = multiprocessing.Process(target=process_yolo, args=(process_stop_event, csi_count, frame_queue, logger, result_dir))
 
     csi_capture_process.start()
     camera_process.start()
