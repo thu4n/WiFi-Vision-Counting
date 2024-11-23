@@ -12,6 +12,7 @@ from csi_preprocessor_nano import process_csi_from_csv
 import multiprocessing
 import psutil
 import sys
+from info_logger import info_logger
 
 # Nano specific libs
 import pycuda.driver as cuda
@@ -22,18 +23,18 @@ import tensorrt as trt
 MAX_CPU_PERCENT = 85  # Maximum CPU usage percentage
 MAX_MEMORY_PERCENT = 85  # Maximum memory usage percentage
 
-def check_resources():
+def check_resources(pretext, logger):
     # Check CPU usage
     cpu_percent = psutil.cpu_percent(interval=1)
-    print(f"CPU usage: {cpu_percent}%")
-    if cpu_percent > MAX_CPU_PERCENT:
-       sys.exit(1)
+    logger.info(f"{pretext} - CPU usage: {cpu_percent}%")
+    #if cpu_percent > MAX_CPU_PERCENT:
+    #   sys.exit(1)
 
     # Check memory usage
     memory_info = psutil.virtual_memory()
-    print(f"Memory usage: {memory_info.percent}%")
-    if memory_info.percent > MAX_MEMORY_PERCENT:
-       sys.exit(1)
+    logger.info(f"{pretext} - Memory usage: {memory_info.percent}%")
+    #if memory_info.percent > MAX_MEMORY_PERCENT:
+    #   sys.exit(1)
 
 '''
 CSI Section 
@@ -74,8 +75,6 @@ def capture_csi(output_file, stop_event, data_ready_event, inference_done_event,
 
                         if frame == 1:
                             print("--- Start capturing CSI frames ---")
-                        if frame == 200:
-                            print("Full")
 
                 except Exception as e:
                     print("CSI Data Writing Exception:", {e})
@@ -104,19 +103,16 @@ def allocate_buffers(engine):
     return h_input, d_input, h_output, d_output
 
 # Function to perform inference with TensorRT engine
-def csi_inference(engine, h_input, d_input, h_output, d_output, csi_data):
+def csi_inference(stream, context, h_input, d_input, h_output, d_output, csi_data, logger):
     print("Running actual inference")
-    check_resources()
-    stream = cuda.Stream()
     np.copyto(h_input, csi_data.ravel())
 
     # Copy input data to the device
     cuda.memcpy_htod_async(d_input, h_input, stream)
 
     # Run inference
-    with engine.create_execution_context() as context:
-        context.execute_async(bindings=[int(d_input), int(d_output)], stream_handle=stream.handle)
-    
+    context.execute_async(bindings=[int(d_input), int(d_output)], stream_handle=stream.handle)
+    check_resources("CSI model inference",logger)
     # Copy output data to the host
     cuda.memcpy_dtoh_async(h_output, d_output, stream)
     stream.synchronize()
@@ -143,9 +139,9 @@ def gstreamer_pipeline(
         f"videoconvert ! video/x-raw, format=(string)BGR ! appsink"
     )
 
-def capture_frame(stop_event, frame_queue):
+def capture_frame(stop_event, frame_queue, logger):
     cap = cv2.VideoCapture(gstreamer_pipeline(flip_method=0), cv2.CAP_GSTREAMER)
-    check_resources()
+    check_resources("capture_frame",logger)
     if not cap.isOpened():
         print("Error: Could not open camera.")
         return
@@ -154,26 +150,27 @@ def capture_frame(stop_event, frame_queue):
         if ret:
             if not frame_queue.full():
                 frame_queue.put(frame)
-        time.sleep(0.2) # Let the nano breathe a little bit
+        #time.sleep(0.2) # Let the nano breathe a little bit
     cap.release()
 
-def process_yolo(stop_event,csi_count,frame_queue):
+def process_yolo(stop_event,csi_count,frame_queue, logger):
     print("YOLO Process: Running")
     # Load configuration and model
     cfg = utils.utils.load_datafile('./data/coco.data')
-    model_path = 'modelzoo/yolofv2-nano-190-epoch-0.953577ap-model.pth'
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model_path = 'modelzoo/coco2017-0.241078ap-model.pth'
+    device = torch.device("cpu")
     yolo_model = model.detector.Detector(cfg["classes"], cfg["anchor_num"], True).to(device)
     yolo_model.load_state_dict(torch.load(model_path, map_location=device))
-    check_resources()
+    check_resources("YOLO init",logger)
     yolo_model.eval()
-    LABEL_NAMES = ['person']
+    LABEL_NAMES = []
+    with open(cfg["names"], 'r') as f:
+        LABEL_NAMES = [line.strip() for line in f.readlines()]
 
     cv_count = 0
 
     while not stop_event.is_set():
         if not frame_queue.empty():
-            check_resources()
             frame = frame_queue.get()
             # Resize frame to model input size
             res_img = cv2.resize(frame, (cfg["width"], cfg["height"]), interpolation=cv2.INTER_LINEAR)
@@ -185,6 +182,7 @@ def process_yolo(stop_event,csi_count,frame_queue):
             preds = yolo_model(img)
             end = time.perf_counter()
             print(f"Inference time: {(end - start) * 1000:.2f} ms")
+            check_resources("YOLO inference", logger)
 
             # Procescsi_data_ready_events predictions
             output = utils.utils.handel_preds(preds, cfg, device)
@@ -213,13 +211,16 @@ def process_yolo(stop_event,csi_count,frame_queue):
                     cv2.putText(frame, f"CSI count: {csi_count.value}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
                 except:
                     continue
+            print("------------Prediction------------")
+            logger.info(f"CV count: {cv_count}")
+            logger.info(f"CSI count: {csi_count.value}")
 
             # Display result
-            cv2.imshow("CSI Camera Detection", frame)
+            #cv2.imshow("CSI Camera Detection", frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 stop_event.set()
                 break
-        time.sleep(2)
+        #time.sleep(2)
 
     cv2.destroyAllWindows()
 
@@ -238,12 +239,14 @@ if __name__ == '__main__':
     if not os.path.exists(csi_engine_path):
         print("CSI TRT Engine not found")
         exit(1)
-
+    logger = info_logger()
     # Load TensorRT engine
     trt_logger = trt.Logger(trt.Logger.INFO)
     trt.init_libnvinfer_plugins(trt_logger, '')
     csi_model = load_engine(csi_engine_path)
     h_input, d_input, h_output, d_output = allocate_buffers(csi_model)
+    context = csi_model.create_execution_context()
+    stream = cuda.Stream()
 
     print("CSI Inference Engine: Running")
 
@@ -254,18 +257,11 @@ if __name__ == '__main__':
     csi_count = multiprocessing.Value('d', 0.0) # Share count value with YOLO process
     frame_queue = multiprocessing.Queue(maxsize=5) 
 
-    cfg = utils.utils.load_datafile('./data/coco.data')
-    model_path = 'modelzoo/yolofv2-nano-190-epoch-0.953577ap-model.pth'
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    yolo_model = model.detector.Detector(cfg["classes"], cfg["anchor_num"], True).to(device)
-    yolo_model.load_state_dict(torch.load(model_path, map_location=device))
-    check_resources()
-    yolo_model.eval()
-    check_resources()
+    check_resources("CSI model init",logger)
     # Start processes for collecting CSI data, processing YOLO, and combining outputs
     csi_capture_process = multiprocessing.Process(target=capture_csi, args=(output_file, process_stop_event, csi_data_ready_event, csi_inference_done_event ,"/dev/ttyUSB0"))
-    camera_process = multiprocessing.Process(target=capture_frame, args=(process_stop_event, frame_queue))
-    yolo_process = multiprocessing.Process(target=process_yolo, args=(process_stop_event, csi_count, frame_queue))
+    camera_process = multiprocessing.Process(target=capture_frame, args=(process_stop_event, frame_queue, logger))
+    yolo_process = multiprocessing.Process(target=process_yolo, args=(process_stop_event, csi_count, frame_queue, logger))
 
     csi_capture_process.start()
     camera_process.start()
@@ -277,7 +273,6 @@ if __name__ == '__main__':
                 print("Waiting for data_ready_event")
                 csi_data_ready_event.wait()
                 csi_data_ready_event.clear()
-                check_resources()
                 try:
                     with open(output_file, mode="r") as csvfile:
                         csv_reader = csv.reader(csvfile)
@@ -285,8 +280,8 @@ if __name__ == '__main__':
                         
                         if len(rows) > 1:
                             processed_csi = process_csi_from_csv(output_file)
-                            pred = csi_inference(csi_model, h_input, d_input, h_output, d_output, processed_csi)
-                            print("CSI count:", pred)
+                            csi_count.value = csi_inference(stream, context, h_input, d_input, h_output, d_output, processed_csi, logger)
+                            # print("CSI count:", pred)
                 except Exception as e:
                     print("Super exception when reading csv: ", e)
                     pass
@@ -301,3 +296,4 @@ if __name__ == '__main__':
         camera_process.join()
         yolo_process.join()
         print("All processes stopped.")
+
