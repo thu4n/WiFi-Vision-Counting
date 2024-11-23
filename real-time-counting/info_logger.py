@@ -8,7 +8,7 @@ def info_logger():
     # File handler
     current_time = datetime.datetime.now()
     formatted_time = current_time.strftime("%Y-%m-%d-%H-%M-%S")
-    file_handler = logging.FileHandler(f'{formatted_time}_csi_inference.log')
+    file_handler = logging.FileHandler(f'{formatted_time}_inference.log')
     file_handler.setLevel(logging.INFO)
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     file_handler.setFormatter(formatter)
