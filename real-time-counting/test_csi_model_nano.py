@@ -44,13 +44,13 @@ def inference(engine, h_input, d_input, h_output, d_output):
 
 if __name__ == '__main__':
     # Path to the TensorRT engine file
-    engine_file_path = '/home/thu4n/1611_model_fold_2.trt'
+    engine_file_path = './modelzoo/haitc_2111_model_fold_2.trt'
 
     # Load TensorRT engine
     trt_logger = trt.Logger(trt.Logger.INFO)
     trt.init_libnvinfer_plugins(trt_logger, '')
     engine = load_engine(engine_file_path)
-
+    print(type(engine))
     # Allocate buffers for input and output
     h_input, d_input, h_output, d_output = allocate_buffers(engine)
 

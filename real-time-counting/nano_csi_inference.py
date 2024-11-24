@@ -124,7 +124,7 @@ if __name__ == '__main__':
 
     # Load TensorRT engine
     print("CSI Inference Engine: Starting")
-    csi_engine_path = 'modelzoo/2111_model_fold_2.trt'
+    csi_engine_path = 'modelzoo/haitc_2111_model_fold_2.trt'
 
     if not os.path.exists(csi_engine_path):
         print("CSI TRT Engine not found")
