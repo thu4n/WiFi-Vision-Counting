@@ -110,8 +110,8 @@ if __name__ == '__main__':
 
                 if category == 'person':
                     cv_count += 1
-                    x1, y1 = int(box[0] * scale_w), int(box[1] * scale_h)
-                    x2, y2 = int(box[2] * scale_w), int(box[3] * scale_h)
+                    # x1, y1 = int(box[0] * scale_w), int(box[1] * scale_h)
+                    # x2, y2 = int(box[2] * scale_w), int(box[3] * scale_h)
 
                     #cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 255, 0), 2)
                     #cv2.putText(frame, f'{category} {obj_score:.2f}', (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
