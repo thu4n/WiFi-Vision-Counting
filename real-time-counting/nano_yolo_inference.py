@@ -11,8 +11,8 @@ import sys
 from info_logger import info_logger
 
 # Define resource limits
-MAX_CPU_PERCENT = 85  # Maximum CPU usage percentage
-MAX_MEMORY_PERCENT = 85  # Maximum memory usage percentage
+MAX_CPU_PERCENT = 90  # Maximum CPU usage percentage
+MAX_MEMORY_PERCENT = 90  # Maximum memory usage percentage
 
 def check_resources():
     # Check CPU usage
@@ -36,7 +36,7 @@ def gstreamer_pipeline(
     capture_height=720,
     display_width=1280,
     display_height=720,
-    framerate=60,
+    framerate=59,
     flip_method=0,
 ):
     return (
@@ -57,8 +57,8 @@ if __name__ == '__main__':
     
     # Load configuration and model
     cfg = utils.utils.load_datafile('./data/coco.data')
-    model_path = 'modelzoo/yolofv2-nano-190-epoch-0.953577ap-model.pth'
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model_path = 'modelzoo/yolofv2-nano-200-epoch-0.978090ap-model.pth'
+    device = torch.device("cpu")
     yolo_model = model.detector.Detector(cfg["classes"], cfg["anchor_num"], True).to(device)
     yolo_model.load_state_dict(torch.load(model_path, map_location=device))
     check_resources()
@@ -66,8 +66,10 @@ if __name__ == '__main__':
     LABEL_NAMES = ['person']
 
     try:
-        while True:
+        while cap.isOpened():
             ret, frame = cap.read()
+            if not ret:
+                break
             if ret:
                 check_resources()
                 # Resize frame to model input size
