@@ -5,3 +5,4 @@ real-time-counting/model/backbone/__pycache__/
 real-time-counting/utils/__pycache__/
 *.log
 real-time-counting/csi_raw/*
+venv/
