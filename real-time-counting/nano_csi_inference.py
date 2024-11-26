@@ -141,7 +141,7 @@ if __name__ == '__main__':
 
     print("CSI Inference Engine: Running")
     print("Setting up socket connection...")
-    client_socket = setup_client('192.1268.1.10', '65533')
+    client_socket = setup_client('192.1268.1.10', 65533)
 
     # Threading prep
     process_stop_event = threading.Event()
@@ -173,7 +173,7 @@ if __name__ == '__main__':
 
                             packed_data = struct.pack('f', pred)
                             client_socket.sendall(packed_data)
-                            
+
                             check_resources(logger)
                 except Exception as e:
                     print("Super exception when reading csv: ", e)

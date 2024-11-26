@@ -75,7 +75,7 @@ if __name__ == '__main__':
     cv_count = 0
     csi_count = 0
 
-    conn, addr = setup_server('192.168.1.10', '65533')
+    conn, addr = setup_server('192.168.1.10', 65533)
 
     while cap.isOpened():
         ret, frame = cap.read()
