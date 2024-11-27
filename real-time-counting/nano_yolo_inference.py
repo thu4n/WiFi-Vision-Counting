@@ -13,6 +13,15 @@ from socket_setup import setup_server
 MAX_CPU_PERCENT = 90  # Maximum CPU usage percentage
 MAX_MEMORY_PERCENT = 90  # Maximum memory usage percentage
 
+def calculate_combined_count(is_dark, cv_count, csi_count):
+    cv_weight = 0.6
+    csi_weight = 0.4   
+    if is_dark:
+        cv_weight = 0.3
+        csi_weight = 0.7
+    combined_count = cv_weight * cv_count + csi_weight * csi_count
+    return combined_count
+
 def check_resources(logger):
     # Check CPU usage
     cpu_percent = psutil.cpu_percent(interval=1)
@@ -132,7 +141,10 @@ if __name__ == '__main__':
         if not csi_count:
             continue
         else:
-            print("Received:", csi_count)
+            print("Received CSI count")
+            combined_count = calculate_combined_count(is_dark=False, cv_count=cv_count, csi_count=csi_count)
+            logger.info(f"CSI count: {csi_count}")
+            logger.info(f"Combined count: {combined_count}")
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break

@@ -173,7 +173,7 @@ if __name__ == '__main__':
 
                             packed_data = struct.pack('f', pred)
                             client_socket.sendall(packed_data)
-
+                            print("CSI count sent.")
                             check_resources(logger)
                 except Exception as e:
                     print("Super exception when reading csv: ", e)
