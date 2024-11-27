@@ -9,6 +9,8 @@ import threading
 import psutil
 import sys
 from info_logger import info_logger
+from socket_setup import setup_client
+import struct
 
 # Nano specific libs
 import pycuda.driver as cuda
@@ -138,6 +140,8 @@ if __name__ == '__main__':
     stream = cuda.Stream()
 
     print("CSI Inference Engine: Running")
+    print("Setting up socket connection...")
+    client_socket = setup_client('192.1268.1.10', 65533)
 
     # Threading prep
     process_stop_event = threading.Event()
@@ -163,8 +167,13 @@ if __name__ == '__main__':
                             processed_csi = process_csi_from_csv(output_file)
                             pred = csi_inference(stream, context, h_input, d_input, h_output, d_output, processed_csi)
                             end = time.perf_counter()
+
                             logger.info(f"Inference time (preprocessing included): {(end - start) * 1000:.2f} ms")
                             logger.info(f"CSI count: {pred}")
+
+                            packed_data = struct.pack('f', pred)
+                            client_socket.sendall(packed_data)
+                            print("CSI count sent.")
                             check_resources(logger)
                 except Exception as e:
                     print("Super exception when reading csv: ", e)
@@ -175,6 +184,7 @@ if __name__ == '__main__':
                     print("Exception occurred when processing CSI data:", e)
     except KeyboardInterrupt:
         print("Processes stopping...")
+        client_socket.close()
         process_stop_event.set()
         csi_capture_process.join()
         print("All processes stopped.")

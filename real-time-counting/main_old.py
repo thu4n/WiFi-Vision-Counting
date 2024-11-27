@@ -7,20 +7,10 @@ import model.detector
 import psutil
 import sys
 from info_logger import info_logger
-from socket_setup import setup_server
 
 # Define resource limits
 MAX_CPU_PERCENT = 90  # Maximum CPU usage percentage
 MAX_MEMORY_PERCENT = 90  # Maximum memory usage percentage
-
-def calculate_combined_count(is_dark, cv_count, csi_count):
-    cv_weight = 0.6
-    csi_weight = 0.4   
-    if is_dark:
-        cv_weight = 0.3
-        csi_weight = 0.7
-    combined_count = cv_weight * cv_count + csi_weight * csi_count
-    return combined_count
 
 def check_resources(logger):
     # Check CPU usage
@@ -84,8 +74,6 @@ if __name__ == '__main__':
     cv_count = 0
     csi_count = 0
 
-    conn, addr = setup_server('192.168.1.10', 65533)
-
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
@@ -111,8 +99,8 @@ if __name__ == '__main__':
             output = utils.utils.handel_preds(preds, cfg, device)
             output_boxes = utils.utils.non_max_suppression(output, conf_thres=0.3, iou_thres=0.4)
 
-            # h, w, _ = frame.shape
-            # scale_h, scale_w = h / cfg["height"], w / cfg["width"]
+            h, w, _ = frame.shape
+            scale_h, scale_w = h / cfg["height"], w / cfg["width"]
             cv_count = 0
             # Draw bounding boxes
             for box in output_boxes[0]:
@@ -127,25 +115,15 @@ if __name__ == '__main__':
 
                     #cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 255, 0), 2)
                     #cv2.putText(frame, f'{category} {obj_score:.2f}', (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
             last_time = current_time
 
             print("------------Prediction------------")
             logger.info(f"CV count: {cv_count}")
-
-        # cv2.putText(frame, f"CV count: {cv_count}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+        cv2.putText(frame, f"CV count: {cv_count}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
         #cv2.putText(frame, f"CSI count: {csi_count[0][0]}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
         # Display result
-        # cv2.imshow("CSI Camera Detection", frame)
-
-        csi_count = conn.recv(1024)
-        if not csi_count:
-            continue
-        else:
-            print("Received CSI count")
-            combined_count = calculate_combined_count(is_dark=False, cv_count=cv_count, csi_count=csi_count)
-            logger.info(f"CSI count: {csi_count}")
-            logger.info(f"Combined count: {combined_count}")
-
+        cv2.imshow("CSI Camera Detection", frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 

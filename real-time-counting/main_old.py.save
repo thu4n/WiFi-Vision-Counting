@@ -4,36 +4,8 @@ import numpy as np
 import time
 import utils.utils
 import model.detector
-import psutil
-import sys
-from info_logger import info_logger
-from socket_setup import setup_server
-
-# Define resource limits
-MAX_CPU_PERCENT = 90  # Maximum CPU usage percentage
-MAX_MEMORY_PERCENT = 90  # Maximum memory usage percentage
-
-def calculate_combined_count(is_dark, cv_count, csi_count):
-    cv_weight = 0.6
-    csi_weight = 0.4   
-    if is_dark:
-        cv_weight = 0.3
-        csi_weight = 0.7
-    combined_count = cv_weight * cv_count + csi_weight * csi_count
-    return combined_count
-
-def check_resources(logger):
-    # Check CPU usage
-    cpu_percent = psutil.cpu_percent(interval=1)
-    logger.info(f"CPU usage: {cpu_percent}%")
-    # if cpu_percent > MAX_CPU_PERCENT:
-    #    sys.exit(1)
-
-    # Check memory usage
-    memory_info = psutil.virtual_memory()
-    logger.info(f"Memory usage: {memory_info.percent}%")
-    # if memory_info.percent > MAX_MEMORY_PERCENT:
-    #    sys.exit(1)
+#import tensorflow as tf
+#import pandas as pd
 
 # Define the CSI camera pipeline
 def gstreamer_pipeline(
@@ -55,18 +27,17 @@ def gstreamer_pipeline(
     )
 
 if __name__ == '__main__':
-    # Logging
-    logger = info_logger()
     # Load configuration and model
     cfg = utils.utils.load_datafile('./data/coco.data')
     model_path = 'modelzoo/coco2017-0.241078ap-model.pth'
-    #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    device = torch.device("cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.detector.Detector(cfg["classes"], cfg["anchor_num"], True).to(device)
     model.load_state_dict(torch.load(model_path, map_location=device))
     model.eval()
 
-    check_resources(logger)
+    #csi_path = 'modelzoo/k-fold_DNNR_session_5.keras' # Download from Google Drive first, another model choice is WiCount_FE_DNNR_2days.keras
+    #csi_model = tf.keras.models.load_model(csi_path)
+    #df = pd.read_csv('data/csi-features-full-d1-5.csv')
 
     # Start CSI camera capture
     cap = cv2.VideoCapture(gstreamer_pipeline(), cv2.CAP_GSTREAMER)
@@ -83,8 +54,6 @@ if __name__ == '__main__':
     interval = 2
     cv_count = 0
     csi_count = 0
-
-    conn, addr = setup_server('192.168.1.10', 65533)
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -104,15 +73,14 @@ if __name__ == '__main__':
             start = time.perf_counter()
             preds = model(img)
             end = time.perf_counter()
-            logger.info(f"Inference time: {(end - start) * 1000:.2f} ms")
-            check_resources(logger)
+            print(f"Inference time: {(end - start) * 1000:.2f} ms")
 
             # Process predictions
             output = utils.utils.handel_preds(preds, cfg, device)
             output_boxes = utils.utils.non_max_suppression(output, conf_thres=0.3, iou_thres=0.4)
 
-            # h, w, _ = frame.shape
-            # scale_h, scale_w = h / cfg["height"], w / cfg["width"]
+            h, w, _ = frame.shape
+            scale_h, scale_w = h / cfg["height"], w / cfg["width"]
             cv_count = 0
             # Draw bounding boxes
             for box in output_boxes[0]:
@@ -122,30 +90,20 @@ if __name__ == '__main__':
 
                 if category == 'person':
                     cv_count += 1
-                    # x1, y1 = int(box[0] * scale_w), int(box[1] * scale_h)
-                    # x2, y2 = int(box[2] * scale_w), int(box[3] * scale_h)
+                    x1, y1 = int(box[0] * scale_w), int(box[1] * scale_h)
+                    x2, y2 = int(box[2] * scale_w), int(box[3] * scale_h)
 
                     #cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 255, 0), 2)
                     #cv2.putText(frame, f'{category} {obj_score:.2f}', (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
             last_time = current_time
 
-            print("------------Prediction------------")
-            logger.info(f"CV count: {cv_count}")
-
-        # cv2.putText(frame, f"CV count: {cv_count}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+	print("------------Prediction------------")
+	print(f"CV count: {cv_count}")
+        cv2.putText(frame, f"CV count: {cv_count}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
         #cv2.putText(frame, f"CSI count: {csi_count[0][0]}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
         # Display result
-        # cv2.imshow("CSI Camera Detection", frame)
-
-        csi_count = conn.recv(1024)
-        if not csi_count:
-            continue
-        else:
-            print("Received CSI count")
-            combined_count = calculate_combined_count(is_dark=False, cv_count=cv_count, csi_count=csi_count)
-            logger.info(f"CSI count: {csi_count}")
-            logger.info(f"Combined count: {combined_count}")
-
+":=        cv2.imshow("CSI Camera Detection", frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 

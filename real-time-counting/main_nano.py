@@ -184,7 +184,7 @@ def process_yolo(stop_event,csi_count,frame_queue, logger, output_dir):
             res_img = cv2.resize(frame, (cfg["width"], cfg["height"]), interpolation=cv2.INTER_LINEAR)
             img = res_img.reshape(1, cfg["height"], cfg["width"], 3)
             img = torch.from_numpy(img.transpose(0, 3, 1, 2)).to(device).float() / 255.0
-            is_dark = check_dark_frame(img)
+            is_dark = check_dark_frame(frame)
 
             # Model inference
             start = time.perf_counter()
