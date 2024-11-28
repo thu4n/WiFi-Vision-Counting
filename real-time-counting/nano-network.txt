@@ -1,4 +1,0 @@
-# thu4n-nano (if this doesn't work, use GUI to set manually)
-sudo ifconfig eth0 192.168.1.10 netmask 255.255.255.0 up
-# haitc-nano
-sudo ifconfig eth0 192.168.1.11 netmask 255.255.255.0 up

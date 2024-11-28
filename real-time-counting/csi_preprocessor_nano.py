@@ -25,16 +25,6 @@ class ESP32:
         """
         return self.csi_df
 
-    def filter_by_sig_mode(self, sig_mode):
-        """Filter CSI data by signal mode
-        Args:
-            sig_mode (int):
-            0 : Non - High Throughput Signals (non-HT)
-            1 : HIgh Throughput Signals (HT)
-        """
-        self.csi_df = self.csi_df.loc[self.csi_df['sig_mode'] == sig_mode]
-        return self
-
     def get_csi(self):
         """Read CSI string as Numpy array
 
@@ -46,11 +36,6 @@ class ESP32:
         NOTE: Not all 3 field may not be present (as represented in table and configuration)
         """
         raw_csi_data = self.csi_df['CSI_DATA'].copy()
-
-        # csi_data = []
-        # for csi_datum in raw_csi_data:
-        #     csi_datum = csi_datum.strip('[ ]')
-        #     data = [int]
         csi_data = np.array([np.fromstring(csi_datum.strip('[ ]'), dtype=int, sep = ' ') for csi_datum in raw_csi_data])
         csi_data = [csi_datum for csi_datum in csi_data if len(csi_datum) == 128]
         self.csi_data = np.array(csi_data)
@@ -83,7 +68,6 @@ class ESP32:
         """
         try:
             self.amplitude = np.array([np.sqrt(data[::2]**2 + data[1::2]**2) for data in self.csi_data])
-            # amplitude = np.array([np.sqrt(data[::2]**2 + data[1::2]**2) for data in self.csi_data])
             print("Amplitude extracted")
             return self
         except IndexError as e:
@@ -158,7 +142,7 @@ def process_csi_from_csv(csi_path):
     temp_np_array = np.array(temp_df) # Turn into numpy array for easier matrix calculation
 
     temp_df = extract_features(temp_np_array)
-    scaler = joblib.load('modelzoo/2111_scaler_fold_2.pkl')
+    scaler = joblib.load('modelzoo/2111_scaler_fold_2.pkl') # This is a StandardScaler from scikit-learn
     final_csi_data = scaler.transform(temp_df)
     print("Data scaled")
     return final_csi_data

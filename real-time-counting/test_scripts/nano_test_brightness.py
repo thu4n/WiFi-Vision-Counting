@@ -44,5 +44,5 @@ while True:
     check_dark_frame(frame)
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
-    #time.sleep(0.2) # Let the nano breathe a little bit
+
 cap.release()
