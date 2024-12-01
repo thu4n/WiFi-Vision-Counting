@@ -7,6 +7,7 @@ import model.detector
 import psutil
 import sys
 from info_logger import info_logger
+from socket_setup import setup_server
 
 # Define resource limits
 MAX_CPU_PERCENT = 90  # Maximum CPU usage percentage
@@ -115,7 +116,6 @@ if __name__ == '__main__':
 
                     #cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 255, 0), 2)
                     #cv2.putText(frame, f'{category} {obj_score:.2f}', (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-
             last_time = current_time
 
             print("------------Prediction------------")
